@@ -1,0 +1,211 @@
+.graph-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: calc(100vh - 180px);
+}
+
+.graph-header-card {
+  padding: 16px 24px !important;
+}
+
+.graph-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.network-icon {
+  color: var(--accent);
+}
+
+.graph-body-grid {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 24px;
+  flex-grow: 1;
+  min-height: 0; /* Important for flex child scroll */
+}
+
+@media (max-width: 1024px) {
+  .graph-body-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 2fr 1fr;
+  }
+}
+
+.flow-viewer-container {
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.react-flow-wrapper {
+  width: 100%;
+  height: 100%;
+  flex-grow: 1;
+}
+
+.graph-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text);
+}
+
+/* ReactFlow Custom Overrides */
+.react-flow__renderer {
+  background: var(--bg);
+}
+
+.react-flow__controls {
+  box-shadow: var(--shadow) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: var(--card-bg) !important;
+  color: var(--text-h) !important;
+  border-bottom: 1px solid var(--border) !important;
+  fill: currentColor !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--code-bg) !important;
+}
+
+.react-flow__minimap {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+/* Node details panel styling */
+.node-details-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.selected-node-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.node-badge-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  color: var(--accent);
+}
+
+.node-badge-title h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.node-icon {
+  flex-shrink: 0;
+}
+
+.node-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--code-bg);
+  padding: 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.spec-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.spec-val {
+  color: var(--text-h);
+  font-weight: 600;
+  text-align: right;
+}
+
+.status-ok {
+  color: #10b981;
+}
+
+.telemetry-block h5 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.telemetry-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.telemetry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.telemetry-card.font-warn {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.02);
+}
+
+.tel-title {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.tel-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.font-warn .tel-val {
+  color: #f59e0b;
+}
+
+.node-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 10px;
+  color: var(--text);
+  flex-grow: 1;
+}
