@@ -1,6 +1,5 @@
-
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-
+import MaintenanceSchedule from "./pages/MaintenanceSchedule";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 
@@ -11,6 +10,7 @@ import Compliance from "./pages/Compliance";
 import RCA from "./pages/RCA";
 import KnowledgeGraph from "./pages/KnowledgeGraph";
 import Lessons from "./pages/Lessons";
+import CrossReference from "./pages/CrossReference";
 
 function App() {
   return (
@@ -29,6 +29,10 @@ function App() {
               path="/"
               element={<Dashboard />}
             />
+            <Route
+    path="/maintenance"
+    element={<MaintenanceSchedule />}
+/>
 
             <Route
               path="/documents"
@@ -38,6 +42,11 @@ function App() {
             <Route
               path="/copilot"
               element={<Copilot />}
+            />
+
+            <Route
+              path="/cross-reference"
+              element={<CrossReference />}
             />
 
             <Route
@@ -63,10 +72,10 @@ function App() {
           </Routes>
 
         </div>
+
       </div>
     </BrowserRouter>
   );
 }
 
 export default App;
-

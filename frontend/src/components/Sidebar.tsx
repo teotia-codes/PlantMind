@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-
+import { CalendarClock } from "lucide-react";
 import {
   LayoutDashboard,
   FileText,
@@ -11,6 +10,7 @@ import {
   Network,
   Cpu,
   BookOpen,
+  GitCompare,
 } from "lucide-react";
 
 import "./Sidebar.css";
@@ -39,7 +39,11 @@ export default function Sidebar() {
       label: "Dashboard",
       icon: LayoutDashboard,
     },
-
+{
+    to: "/maintenance",
+    label: "Maintenance Planner",
+    icon: CalendarClock,
+},
     {
       to: "/documents",
       label: "Documents",
@@ -50,6 +54,12 @@ export default function Sidebar() {
       to: "/copilot",
       label: "Copilot",
       icon: MessageSquareCode,
+    },
+
+    {
+      to: "/cross-reference",
+      label: "Cross Reference",
+      icon: GitCompare,
     },
 
     {

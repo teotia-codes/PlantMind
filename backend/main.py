@@ -12,7 +12,7 @@ from rag.chroma_service  import store_chunks, search_chunks, collection, delete_
 from rag.entity_extractor import extract_entities
 from rag.graph_service   import save_graph, get_graph_data, get_equipment_count, driver
 from rag.gemini_service  import generate_answer
-
+from rag.maintenance_agent import generate_maintenance_schedule
 # ────────────────────────────────────────────────────────────
 app = FastAPI(
     title="PlantMind AI",
@@ -53,7 +53,13 @@ class ComplianceRequest(BaseModel):
 class LessonsRequest(BaseModel):
     query: str
 
-
+class CrossReferenceRequest(BaseModel):
+    question: str
+    doc_a: str
+    doc_b: str
+class MaintenanceScheduleRequest(BaseModel):
+    equipment: str
+    horizon: str
 # ────────────────────────────────────────────────────────────
 # Health
 # ────────────────────────────────────────────────────────────
@@ -203,10 +209,168 @@ def chat(req: ChatRequest):
 
     return {"answer": answer, "sources": sources}
 
+@app.post("/cross-reference")
+def cross_reference(req: CrossReferenceRequest):
 
+    import time
+
+    start = time.time()
+
+    # Search first document
+    results_a = search_chunks(
+        query=req.question,
+        n_results=6,
+        source_filter=req.doc_a
+    )
+
+    # Search second document
+    results_b = search_chunks(
+        query=req.question,
+        n_results=6,
+        source_filter=req.doc_b
+    )
+
+    docs_a = results_a.get("documents", [[]])[0]
+    docs_b = results_b.get("documents", [[]])[0]
+
+    context = f"""
+DOCUMENT A
+==========
+Filename:
+{req.doc_a}
+
+Content:
+{" ".join(docs_a)}
+
+--------------------------------------
+
+DOCUMENT B
+==========
+Filename:
+{req.doc_b}
+
+Content:
+{" ".join(docs_b)}
+"""
+
+    prompt = f"""
+You are PlantMind AI.
+
+Compare the two uploaded industrial documents.
+
+Question:
+{req.question}
+
+Produce your answer in EXACTLY this format.
+
+## Agreements
+- ...
+
+## Differences
+- ...
+
+## Missing Information
+- ...
+
+## Combined Recommendation
+- ...
+
+Base your answer ONLY on the supplied context.
+
+If information is missing,
+say so clearly.
+"""
+
+    answer = generate_answer(
+        context,
+        prompt
+    )
+
+    latency = round(
+        time.time() - start,
+        2
+    )
+
+    return {
+
+        "answer": answer,
+
+        "latency": latency,
+
+        "documents": [
+            req.doc_a,
+            req.doc_b
+        ],
+
+        "sources": [
+            {
+                "file": req.doc_a,
+                "chunks": len(docs_a)
+            },
+            {
+                "file": req.doc_b,
+                "chunks": len(docs_b)
+            }
+        ]
+    }
+
+@app.post("/maintenance-schedule")
+def maintenance_schedule(req: MaintenanceScheduleRequest):
+
+    start = time.time()
+
+    query = (
+        f"{req.equipment} maintenance "
+        "inspection lubrication overhaul "
+        "frequency preventive schedule"
+    )
+
+    results = search_chunks(
+        query=query,
+        n_results=10,
+    )
+
+    docs = results.get("documents", [[]])[0]
+
+    context = "\n\n".join(docs)
+
+    answer = generate_maintenance_schedule(
+        context=context,
+        equipment=req.equipment,
+        horizon=req.horizon,
+    )
+
+    latency = round(
+        time.time() - start,
+        2
+    )
+
+    return {
+
+        "equipment": req.equipment,
+
+        "horizon": req.horizon,
+
+        "schedule": answer,
+
+        "latency": latency,
+
+        "sources": list(
+            {
+                meta.get("source", "unknown")
+                for meta in results.get(
+                    "metadatas",
+                    [[]],
+                )[0]
+            }
+        )
+
+    }
 # ────────────────────────────────────────────────────────────
 # Root Cause Analysis
 # ────────────────────────────────────────────────────────────
+
+
 
 @app.post("/rca", tags=["rca"])
 def rca(req: RCARequest):

@@ -39,7 +39,15 @@ export interface RCAResponse {
 export interface LessonsResponse {
   analysis: string;
 }
-
+export interface CrossReferenceResponse {
+  answer: string;
+  latency: number;
+  documents: string[];
+  sources: {
+    file: string;
+    chunks: number;
+  }[];
+}
 export interface GraphNode {
   id: string;
   label: string;
@@ -80,11 +88,50 @@ export interface ActivityEvent {
   message?: string;
   timestamp: number;
 }
-
+export interface MaintenanceScheduleResponse {
+  equipment: string;
+  horizon: string;
+  schedule: string;
+  latency: number;
+  sources: string[];
+}
 // ─── API client ─────────────────────────────────────────────────────────────
 
 export const api = {
+  maintenanceSchedule: async (
+  equipment: string,
+  horizon: string
+): Promise<MaintenanceScheduleResponse> => {
 
+  const response =
+    await client.post<MaintenanceScheduleResponse>(
+      "/maintenance-schedule",
+      {
+        equipment,
+        horizon,
+      }
+    );
+
+  return response.data;
+},
+  // Cross Document Comparison
+  crossReference: async (
+  question: string,
+  docA: string,
+  docB: string
+): Promise<CrossReferenceResponse> => {
+
+  const response = await client.post<CrossReferenceResponse>(
+    "/cross-reference",
+    {
+      question,
+      doc_a: docA,
+      doc_b: docB,
+    }
+  );
+
+  return response.data;
+},
   // Documents
   uploadDocument: async (file: File): Promise<UploadResult> => {
     const formData = new FormData();
