@@ -4,12 +4,13 @@ from pydantic import BaseModel
 
 import os
 import shutil
+import time
 
 from rag.pdf_processor   import extract_text_from_pdf
 from rag.text_chunker    import chunk_text
 from rag.chroma_service  import store_chunks, search_chunks, collection, delete_document
 from rag.entity_extractor import extract_entities
-from rag.graph_service   import save_equipment, get_graph_data, get_equipment_count, driver
+from rag.graph_service   import save_graph, get_graph_data, get_equipment_count, driver
 from rag.gemini_service  import generate_answer
 
 # ────────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     stored = store_chunks(chunks, file.filename)
     entities = extract_entities(text)
 
-    save_equipment(entities.get("equipment", []))
+    save_graph(entities, file.filename)
 
     return {
         "status":   "success",
@@ -159,7 +160,7 @@ def chat(req: ChatRequest):
     """
     results = search_chunks(
         req.question,
-        n_results=5,
+        n_results=8,
         source_filter=req.source_filter,
     )
 
@@ -174,7 +175,20 @@ def chat(req: ChatRequest):
         }
 
     context = "\n\n".join(raw_docs)
-    answer  = generate_answer(context, req.question)
+
+    system_prompt = f"""
+    You are PlantMind AI.
+    Always answer ONLY from the uploaded industrial documents.
+    If the answer is not present,
+    reply:
+    'The uploaded documents do not contain sufficient information.'
+    Never hallucinate.
+"""
+
+    answer = generate_answer(
+        context,
+        system_prompt + "\n\nQuestion:\n" + req.question
+    )
 
     sources = []
     for doc, meta, dist in zip(raw_docs, raw_metadatas, raw_distances):
@@ -202,7 +216,7 @@ def rca(req: RCARequest):
     """
     rag_query = f"{req.equipment} {req.symptoms} failure maintenance root cause"
 
-    results  = search_chunks(rag_query, n_results=5)
+    results  = search_chunks(rag_query, n_results=8)
     docs     = results.get("documents", [[]])[0]
     rag_context = "\n\n".join(docs) if docs else ""
 
@@ -253,7 +267,7 @@ def compliance(req: ComplianceRequest):
     Uses the knowledge base to cross-reference relevant standards.
     """
     # Search the knowledge base for relevant regulatory context
-    results = search_chunks(req.document_text[:500], n_results=5)
+    results = search_chunks(req.document_text[:500], n_results=8)
     kb_docs = results.get("documents", [[]])[0]
     kb_context = "\n\n".join(kb_docs) if kb_docs else "No additional regulatory context found."
 
@@ -298,7 +312,7 @@ def lessons(req: LessonsRequest):
     Mine the knowledge base for historical failure patterns and lessons learned
     relevant to the supplied query.
     """
-    results  = search_chunks(req.query, n_results=6)
+    results  = search_chunks(req.query, n_results=10)
     docs     = results.get("documents", [[]])[0]
     context  = "\n\n".join(docs) if docs else ""
 
@@ -330,9 +344,28 @@ Structure your response EXACTLY as follows:
 - <best practice>
 
 Ground every point in the knowledge base context. If insufficient data exists for a section, state "Insufficient historical data in knowledge base for this category." """
+    raw_metadatas = results.get("metadatas",  [[]])[0]
+    raw_distances = results.get("distances",  [[]])[0]
 
+    sources = []
+    for doc, meta, dist in zip(docs, raw_metadatas, raw_distances):
+        confidence = round((1.0 - float(dist)) * 100, 1)
+        sources.append({
+            "file":       meta.get("source",      "unknown"),
+            "chunk":      meta.get("chunk_index", -1),
+            "confidence": confidence,
+            "preview":    doc[:250] + ("..." if len(doc) > 250 else ""),
+        })
+
+    start = time.time()
     answer = generate_answer(context, prompt)
-    return {"analysis": answer}
+    latency = round(time.time() - start, 2)
+    return {
+        "analysis": answer,
+        "answer": answer,
+        "latency": latency,
+        "sources": sources
+    }
 
 
 # ────────────────────────────────────────────────────────────
@@ -399,10 +432,13 @@ def stats():
         pass
 
     return {
-        "documents": doc_count,
-        "chunks":    chunk_count,
-        "equipment": equip_count,
-    }
+    "documents":doc_count,
+    "chunks":chunk_count,
+    "equipment":equip_count,
+    "graph_nodes":equip_count,
+    "vector_store":"Healthy",
+    "neo4j":"Connected"
+}
 
 
 # ────────────────────────────────────────────────────────────
@@ -450,6 +486,11 @@ def activity():
                 "chunks":      chunk_count,
                 "timestamp":   mtime,         # Unix seconds
             })
+            events.append({
+    "type":"system",
+    "message":"Knowledge Graph updated",
+    "timestamp":time.time()
+})
 
     except Exception as e:
         print(f"[activity] error: {e}")

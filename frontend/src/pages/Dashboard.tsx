@@ -34,12 +34,13 @@ function relativeTime(unixSeconds: number): string {
 // Build a per-document chunk bar chart from activity events
 function buildChunkChart(events: ActivityEvent[]) {
   return events
+    .filter((e) => e.type === "upload")
     .slice()
     .reverse()                     // oldest first for chart
     .slice(-8)                     // last 8 uploads
     .map((e) => ({
-      name: e.filename.replace(/\.pdf$/i, "").slice(0, 16),
-      chunks: e.chunks,
+      name: e.filename ? e.filename.replace(/\.pdf$/i, "").slice(0, 16) : "Unknown",
+      chunks: e.chunks ?? 0,
     }));
 }
 
@@ -47,10 +48,11 @@ function buildChunkChart(events: ActivityEvent[]) {
 function buildAccumulationChart(events: ActivityEvent[]) {
   let running = 0;
   return events
+    .filter((e) => e.type === "upload")
     .slice()
     .reverse()
     .map((e, i) => {
-      running += e.chunks;
+      running += e.chunks ?? 0;
       return {
         label: `Upload ${i + 1}`,
         total: running,
@@ -359,22 +361,34 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="alert-list">
-              {activity.map((event, i) => (
-                <div key={i} className="alert-item info-priority activity-row">
-                  <span className="priority-badge">
-                    <Upload size={11} />
-                  </span>
-                  <div className="alert-info">
-                    <h4>{event.filename}</h4>
-                    <p>
-                      {event.chunks} chunks · {formatBytes(event.size_kb)} ingested
-                    </p>
+              {activity.map((event, i) => {
+                const isSystem = event.type === "system";
+                return (
+                  <div key={i} className={`alert-item info-priority activity-row ${isSystem ? 'system-activity' : ''}`}>
+                    <span className="priority-badge">
+                      {isSystem ? <Network size={11} /> : <Upload size={11} />}
+                    </span>
+                    <div className="alert-info">
+                      {isSystem ? (
+                        <>
+                          <h4>System Update</h4>
+                          <p>{event.message}</p>
+                        </>
+                      ) : (
+                        <>
+                          <h4>{event.filename}</h4>
+                          <p>
+                            {event.chunks ?? 0} chunks · {formatBytes(event.size_kb ?? 0)} ingested
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    <span className="alert-time">
+                      {relativeTime(event.timestamp)}
+                    </span>
                   </div>
-                  <span className="alert-time">
-                    {relativeTime(event.timestamp)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

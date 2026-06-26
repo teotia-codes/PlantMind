@@ -2,218 +2,500 @@ import json
 import os
 from neo4j import GraphDatabase
 
-# ----------------------------------
-# Neo4j Connection
-# ----------------------------------
+# ==========================================================
+# Neo4j Configuration
+# ==========================================================
 
-NEO4J_URI  = os.getenv("NEO4J_URI",  "bolt://localhost:7687")
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASS = os.getenv("NEO4J_PASS", "Sid@1133")
 
-# Lazy driver — created once on first use so startup doesn't fail
-# when Neo4j is unavailable.
 _driver = None
 
 
 def _get_driver():
     global _driver
+
     if _driver is None:
         _driver = GraphDatabase.driver(
             NEO4J_URI,
-            auth=(NEO4J_USER, NEO4J_PASS),
+            auth=(NEO4J_USER, NEO4J_PASS)
         )
+
     return _driver
 
 
-# Keep a module-level alias so main.py's existing
-# `from rag.graph_service import driver` still works without crashing.
 class _LazyDriver:
-    """Proxy that forwards .session() to the real driver on first use."""
 
     def session(self, *args, **kwargs):
         return _get_driver().session(*args, **kwargs)
 
     def close(self):
+        global _driver
         if _driver:
             _driver.close()
 
 
 driver = _LazyDriver()
 
-# ----------------------------------
-# Local JSON sidecar for graph data
-# (used as fallback when Neo4j is down)
-# ----------------------------------
+# ==========================================================
+# JSON Sidecar
+# ==========================================================
 
 SIDECAR_PATH = "graph_data.json"
 
 
-def _load_sidecar() -> dict:
+def _load_sidecar():
+
     if os.path.exists(SIDECAR_PATH):
+
         try:
             with open(SIDECAR_PATH, "r") as f:
                 return json.load(f)
+
         except Exception:
             pass
-    return {"nodes": [], "edges": []}
+
+    return {
+        "nodes": [],
+        "edges": []
+    }
 
 
-def _save_sidecar(data: dict):
-    try:
-        with open(SIDECAR_PATH, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"[graph_service] Could not save sidecar: {e}")
+def _save_sidecar(data):
+
+    with open(SIDECAR_PATH, "w") as f:
+        json.dump(data, f, indent=2)
 
 
-# ----------------------------------
-# Save Equipment Nodes
-# ----------------------------------
-
-def save_equipment(equipment_list: list[str]):
-    """
-    Persist equipment tags to Neo4j AND to the local JSON sidecar.
-    The sidecar ensures the graph page always has data, even offline.
-    """
-    if not equipment_list:
-        return
-
-    # --- update sidecar first (always works) ---
-    current = _load_sidecar()
-    existing_ids = {n["id"] for n in current["nodes"]}
-
-    for tag in equipment_list:
-        if tag not in existing_ids:
-            current["nodes"].append({
-                "id":    tag,
-                "label": tag,
-                "type":  "equipment",
-            })
-            existing_ids.add(tag)
-
-    # auto-link adjacent equipment in the list to show relationships
-    for i in range(len(equipment_list) - 1):
-        src, tgt = equipment_list[i], equipment_list[i + 1]
-        edge_id = f"e_{src}_{tgt}"
-        existing_edge_ids = {e["id"] for e in current["edges"]}
-        if edge_id not in existing_edge_ids:
-            current["edges"].append({
-                "id":     edge_id,
-                "source": src,
-                "target": tgt,
-                "label":  "co_referenced",
-            })
-
-    _save_sidecar(current)
-
-    # --- try Neo4j (best-effort) ---
-    try:
-        with _get_driver().session() as session:
-            for tag in equipment_list:
-                session.run(
-                    "MERGE (e:Equipment {name: $name})",
-                    name=tag,
-                )
-    except Exception as e:
-        print(f"[graph_service] Neo4j unavailable, using sidecar only: {e}")
-
-
-# ----------------------------------
-# Get Graph Data
-# ----------------------------------
-
-def get_graph_data() -> dict:
-    """
-    Try Neo4j first; fall back to the JSON sidecar; then fall back to
-    a hardcoded demo graph so the UI is never blank.
-    """
-
-    # 1 — try Neo4j
-    try:
-        nodes, edges = [], []
-
-        with _get_driver().session() as session:
-
-            node_result = session.run(
-                "MATCH (e:Equipment) RETURN e.name AS name"
-            )
-            for record in node_result:
-                nodes.append({
-                    "id":    record["name"],
-                    "label": record["name"],
-                    "type":  "equipment",
-                })
-
-            edge_result = session.run(
-                """
-                MATCH (a)-[r]->(b)
-                RETURN a.name AS source,
-                       b.name AS target,
-                       type(r) AS relation
-                """
-            )
-            for idx, record in enumerate(edge_result):
-                edges.append({
-                    "id":     f"edge_{idx}",
-                    "source": record["source"],
-                    "target": record["target"],
-                    "label":  record["relation"].lower().replace("_", " "),
-                })
-
-        if nodes:
-            return {"nodes": nodes, "edges": edges}
-
-    except Exception as e:
-        print(f"[graph_service] Neo4j query failed: {e}")
-
-    # 2 — fall back to local sidecar (populated on every upload)
-    sidecar = _load_sidecar()
-    if sidecar["nodes"]:
-        return sidecar
-
-    # 3 — nothing ingested yet: return empty graph
-    #     The frontend shows an actionable empty state instead of fake data.
-    return {"nodes": [], "edges": []}
-
-
-# ----------------------------------
+# ==========================================================
 # Helpers
-# ----------------------------------
+# ==========================================================
 
-def create_relationship(source: str, target: str, relation: str = "CONNECTED_TO"):
+def _node_exists(nodes, node_id):
+    return any(n["id"] == node_id for n in nodes)
+
+
+def _edge_exists(edges, edge_id):
+    return any(e["id"] == edge_id for e in edges)
+
+
+def _add_node(data, node_id, label, node_type):
+
+    if not _node_exists(data["nodes"], node_id):
+
+        data["nodes"].append({
+            "id": node_id,
+            "label": label,
+            "type": node_type
+        })
+
+
+def _add_edge(data, source, target, relation):
+
+    edge_id = f"{source}_{relation}_{target}"
+
+    if not _edge_exists(data["edges"], edge_id):
+
+        data["edges"].append({
+            "id": edge_id,
+            "source": source,
+            "target": target,
+            "label": relation
+        })
+
+
+# ==========================================================
+# Main Graph Builder
+# ==========================================================
+
+def save_graph(entities: dict, document_name: str):
+
+    sidecar = _load_sidecar()
+
+    equipment = entities.get("equipment", [])
+    pressures = entities.get("pressures", [])
+    temperatures = entities.get("temperatures", [])
+    regulations = entities.get("regulations", [])
+    incidents = entities.get("incidents", [])
+    maintenance = entities.get("maintenance", [])
+    relationships = entities.get("relationships", [])
+
+    # ---------------------------
+    # Document Node
+    # ---------------------------
+
+    _add_node(
+        sidecar,
+        document_name,
+        document_name,
+        "document"
+    )
+
     try:
+
         with _get_driver().session() as session:
+
             session.run(
-                f"""
-                MERGE (a:Equipment {{name: $source}})
-                MERGE (b:Equipment {{name: $target}})
-                MERGE (a)-[:{relation}]->(b)
+                """
+                MERGE (d:Document {name:$name})
                 """,
-                source=source,
-                target=target,
+                name=document_name
             )
+
+            # ====================================
+            # Equipment
+            # ====================================
+
+            for eq in equipment:
+
+                _add_node(
+                    sidecar,
+                    eq,
+                    eq,
+                    "equipment"
+                )
+
+                _add_edge(
+                    sidecar,
+                    eq,
+                    document_name,
+                    "MENTIONED_IN"
+                )
+
+                session.run(
+                    """
+                    MERGE (e:Equipment {name:$name})
+                    """,
+                    name=eq
+                )
+
+                session.run(
+                    """
+                    MATCH (e:Equipment {name:$eq})
+                    MATCH (d:Document {name:$doc})
+                    MERGE (e)-[:MENTIONED_IN]->(d)
+                    """,
+                    eq=eq,
+                    doc=document_name
+                )
+
+            # ====================================
+            # Pressure
+            # ====================================
+
+            for value in pressures:
+
+                _add_node(
+                    sidecar,
+                    value,
+                    value,
+                    "pressure"
+                )
+
+                session.run(
+                    """
+                    MERGE (p:Pressure {name:$name})
+                    """,
+                    name=value
+                )
+
+                for eq in equipment:
+
+                    _add_edge(
+                        sidecar,
+                        eq,
+                        value,
+                        "HAS_PRESSURE"
+                    )
+
+                    session.run(
+                        """
+                        MATCH (e:Equipment{name:$eq})
+                        MATCH (p:Pressure{name:$val})
+                        MERGE (e)-[:HAS_PRESSURE]->(p)
+                        """,
+                        eq=eq,
+                        val=value
+                    )
+
+            # ====================================
+            # Temperature
+            # ====================================
+
+            for value in temperatures:
+
+                _add_node(
+                    sidecar,
+                    value,
+                    value,
+                    "temperature"
+                )
+
+                session.run(
+                    """
+                    MERGE (t:Temperature{name:$name})
+                    """,
+                    name=value
+                )
+
+                for eq in equipment:
+
+                    _add_edge(
+                        sidecar,
+                        eq,
+                        value,
+                        "HAS_TEMPERATURE"
+                    )
+
+                    session.run(
+                        """
+                        MATCH (e:Equipment{name:$eq})
+                        MATCH (t:Temperature{name:$val})
+                        MERGE (e)-[:HAS_TEMPERATURE]->(t)
+                        """,
+                        eq=eq,
+                        val=value
+                    )
+
+            # ====================================
+            # Regulations
+            # ====================================
+
+            for reg in regulations:
+
+                _add_node(
+                    sidecar,
+                    reg,
+                    reg,
+                    "regulation"
+                )
+
+                session.run(
+                    """
+                    MERGE (r:Regulation{name:$name})
+                    """,
+                    name=reg
+                )
+
+                for eq in equipment:
+
+                    _add_edge(
+                        sidecar,
+                        eq,
+                        reg,
+                        "REGULATED_BY"
+                    )
+
+                    session.run(
+                        """
+                        MATCH (e:Equipment{name:$eq})
+                        MATCH (r:Regulation{name:$reg})
+                        MERGE (e)-[:REGULATED_BY]->(r)
+                        """,
+                        eq=eq,
+                        reg=reg
+                    )
+
+            # ====================================
+            # Incidents
+            # ====================================
+
+            for inc in incidents:
+
+                _add_node(
+                    sidecar,
+                    inc,
+                    inc,
+                    "incident"
+                )
+
+                session.run(
+                    """
+                    MERGE (i:Incident{name:$name})
+                    """,
+                    name=inc
+                )
+
+                for eq in equipment:
+
+                    _add_edge(
+                        sidecar,
+                        eq,
+                        inc,
+                        "HAS_INCIDENT"
+                    )
+
+                    session.run(
+                        """
+                        MATCH (e:Equipment{name:$eq})
+                        MATCH (i:Incident{name:$inc})
+                        MERGE (e)-[:HAS_INCIDENT]->(i)
+                        """,
+                        eq=eq,
+                        inc=inc
+                    )
+
+            # ====================================
+            # Maintenance
+            # ====================================
+
+            for m in maintenance:
+
+                _add_node(
+                    sidecar,
+                    m,
+                    m,
+                    "maintenance"
+                )
+
+                session.run(
+                    """
+                    MERGE (m:Maintenance{name:$name})
+                    """,
+                    name=m
+                )
+
+                for eq in equipment:
+
+                    _add_edge(
+                        sidecar,
+                        eq,
+                        m,
+                        "REQUIRES"
+                    )
+
+                    session.run(
+                        """
+                        MATCH (e:Equipment{name:$eq})
+                        MATCH (m:Maintenance{name:$task})
+                        MERGE (e)-[:REQUIRES]->(m)
+                        """,
+                        eq=eq,
+                        task=m
+                    )
+
+            # ====================================
+            # Equipment Relationships
+            # ====================================
+
+            for rel in relationships:
+
+                src = rel["source"]
+                tgt = rel["target"]
+                relation = rel["relation"]
+
+                _add_edge(
+                    sidecar,
+                    src,
+                    tgt,
+                    relation
+                )
+
+                session.run(
+                    f"""
+                    MERGE (a:Equipment {{name:$src}})
+                    MERGE (b:Equipment {{name:$tgt}})
+                    MERGE (a)-[:{relation}]->(b)
+                    """,
+                    src=src,
+                    tgt=tgt
+                )
+
     except Exception as e:
-        print(f"[graph_service] create_relationship failed: {e}")
+
+        print("[graph_service]", e)
+
+    _save_sidecar(sidecar)
 
 
-def get_equipment_count() -> int:
+# ==========================================================
+# Graph API
+# ==========================================================
+
+def get_graph_data():
+
     try:
-        with _get_driver().session() as session:
-            result = session.run(
-                "MATCH (e:Equipment) RETURN count(e) AS total"
-            )
-            return result.single()["total"]
-    except Exception:
-        sidecar = _load_sidecar()
-        return len(sidecar.get("nodes", []))
 
+        nodes = []
+        edges = []
+
+        with _get_driver().session() as session:
+
+            node_query = session.run("""
+                MATCH (n)
+                RETURN elementId(n) as id,
+                       labels(n)[0] as type,
+                       n.name as label
+            """)
+
+            for row in node_query:
+
+                nodes.append({
+                    "id": str(row["id"]),
+                    "label": row["label"],
+                    "type": row["type"].lower()
+                })
+
+            edge_query = session.run("""
+                MATCH (a)-[r]->(b)
+                RETURN elementId(r) as id,
+                       elementId(a) as source,
+                       elementId(b) as target,
+                       type(r) as relation
+            """)
+
+            for row in edge_query:
+
+                edges.append({
+                    "id": str(row["id"]),
+                    "source": str(row["source"]),
+                    "target": str(row["target"]),
+                    "label": row["relation"]
+                })
+
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
+
+    except Exception:
+
+        return _load_sidecar()
+
+
+# ==========================================================
+# Stats
+# ==========================================================
+
+def get_equipment_count():
+
+    graph = get_graph_data()
+
+    return len([
+        n for n in graph["nodes"]
+        if n["type"] == "equipment"
+    ])
+
+
+# ==========================================================
+# Clear Graph
+# ==========================================================
 
 def clear_graph():
-    try:
-        with _get_driver().session() as session:
-            session.run("MATCH (n) DETACH DELETE n")
-    except Exception as e:
-        print(f"[graph_service] clear_graph failed: {e}")
 
-    # also clear sidecar
-    _save_sidecar({"nodes": [], "edges": []})
+    try:
+
+        with _get_driver().session() as session:
+
+            session.run(
+                "MATCH (n) DETACH DELETE n"
+            )
+
+    except:
+        pass
+
+    _save_sidecar({
+        "nodes": [],
+        "edges": []
+    })

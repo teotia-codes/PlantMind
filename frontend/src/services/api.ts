@@ -74,9 +74,10 @@ export interface UploadResult {
 
 export interface ActivityEvent {
   type: string;
-  filename: string;
-  size_kb: number;
-  chunks: number;
+  filename?: string;
+  size_kb?: number;
+  chunks?: number;
+  message?: string;
   timestamp: number;
 }
 
