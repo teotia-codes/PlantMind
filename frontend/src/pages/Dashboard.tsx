@@ -1,248 +1,387 @@
-import { useState, useEffect } from "react";
-import { api, type DocumentInfo } from "../services/api";
+import { useState, useEffect, useCallback } from "react";
 import {
-  FileText,
-  Activity,
-  AlertTriangle,
-  Heart,
-  ArrowUpRight,
-  TrendingUp,
+  api,
+  type SystemStats,
+  type DocumentInfo,
+  type ActivityEvent,
+} from "../services/api";
+import {
+  FileText, Activity, Database, Network,
+  ArrowUpRight, RefreshCw, Upload,
+  CheckCircle2, Clock, Layers,
 } from "lucide-react";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, BarChart, Bar, Cell,
 } from "recharts";
 import "./Dashboard.css";
 
-// Sample Telemetry Data
-const telemetryData = [
-  { time: "08:00", pressure: 120, temp: 210, flow: 95 },
-  { time: "09:00", pressure: 122, temp: 215, flow: 98 },
-  { time: "10:00", pressure: 135, temp: 245, flow: 110 }, // Spike
-  { time: "11:00", pressure: 128, temp: 230, flow: 104 },
-  { time: "12:00", pressure: 121, temp: 212, flow: 94 },
-  { time: "13:00", pressure: 119, temp: 208, flow: 92 },
-  { time: "14:00", pressure: 123, temp: 218, flow: 97 },
-];
+// ── helpers ─────────────────────────────────────────────────────────────────
 
-const incidentHistory = [
-  { month: "Jan", count: 4 },
-  { month: "Feb", count: 3 },
-  { month: "Mar", count: 6 },
-  { month: "Apr", count: 2 },
-  { month: "May", count: 1 },
-  { month: "Jun", count: 3 },
-];
+function formatBytes(kb: number): string {
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(2)} MB`;
+}
+
+function relativeTime(unixSeconds: number): string {
+  const diff = Math.floor(Date.now() / 1000 - unixSeconds);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// Build a per-document chunk bar chart from activity events
+function buildChunkChart(events: ActivityEvent[]) {
+  return events
+    .slice()
+    .reverse()                     // oldest first for chart
+    .slice(-8)                     // last 8 uploads
+    .map((e) => ({
+      name: e.filename.replace(/\.pdf$/i, "").slice(0, 16),
+      chunks: e.chunks,
+    }));
+}
+
+// Build a "chunks over time" accumulation chart
+function buildAccumulationChart(events: ActivityEvent[]) {
+  let running = 0;
+  return events
+    .slice()
+    .reverse()
+    .map((e, i) => {
+      running += e.chunks;
+      return {
+        label: `Upload ${i + 1}`,
+        total: running,
+      };
+    });
+}
+
+// ── component ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const [stats, setStats] = useState<SystemStats | null>(null);
   const [docs, setDocs] = useState<DocumentInfo[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
-  useEffect(() => {
-    const fetchDocs = async () => {
-      try {
-        const data = await api.getDocuments();
-        setDocs(data);
-      } catch (err) {
-        console.error("Failed to load documents on dashboard", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDocs();
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statsData, docsData, activityData] = await Promise.all([
+        api.getStats(),
+        api.getDocuments(),
+        api.getActivity(),
+      ]);
+      setStats(statsData);
+      setDocs(docsData);
+      setActivity(activityData);
+      setLastRefreshed(new Date());
+    } catch (err) {
+      console.error("Dashboard fetch failed:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  const fmt = (n: number | undefined) =>
+    loading ? "--" : (n ?? 0).toLocaleString();
+
+  const chunkChart = buildChunkChart(activity);
+  const accumulationChart = buildAccumulationChart(activity);
+  const hasData = activity.length > 0;
+
+  // ── render ──────────────────────────────────────────────────────────────
   return (
     <div className="page-container dashboard-page">
-      {/* Overview Cards */}
+
+      {/* ── 4 live metric cards ── */}
       <div className="dashboard-grid">
+
         <div className="glass-card metric-card">
           <div className="metric-header">
-            <span className="metric-title">Ingested Knowledge Base</span>
+            <span className="metric-title">Ingested Documents</span>
             <div className="metric-icon-wrap accent-blue">
               <FileText size={20} />
             </div>
           </div>
           <div className="metric-body">
-            <span className="metric-value">{loading ? "--" : docs.length}</span>
+            <span className="metric-value">{fmt(stats?.documents)}</span>
             <span className="metric-change positive">
-              <ArrowUpRight size={14} /> +{docs.length} Active Files
+              <ArrowUpRight size={14} />
+              {fmt(stats?.documents)} PDF files indexed
             </span>
           </div>
-          <div className="metric-footer">Sources analyzed via semantic RAG</div>
+          <div className="metric-footer">
+            Source documents in knowledge base
+          </div>
         </div>
 
         <div className="glass-card metric-card">
           <div className="metric-header">
-            <span className="metric-title">Plant Operating Health</span>
+            <span className="metric-title">Vector Chunks</span>
+            <div className="metric-icon-wrap accent-purple">
+              <Database size={20} />
+            </div>
+          </div>
+          <div className="metric-body">
+            <span className="metric-value">{fmt(stats?.chunks)}</span>
+            <span className="metric-change positive">
+              <ArrowUpRight size={14} />
+              Semantic segments indexed
+            </span>
+          </div>
+          <div className="metric-footer">
+            MiniLM-L6-v2 · ChromaDB cosine store
+          </div>
+        </div>
+
+        <div className="glass-card metric-card">
+          <div className="metric-header">
+            <span className="metric-title">Equipment Entities</span>
             <div className="metric-icon-wrap accent-green">
               <Activity size={20} />
             </div>
           </div>
           <div className="metric-body">
-            <span className="metric-value">98.4%</span>
+            <span className="metric-value">{fmt(stats?.equipment)}</span>
             <span className="metric-change positive">
-              <ArrowUpRight size={14} /> Optimal
+              <ArrowUpRight size={14} />
+              Extracted from documents
             </span>
           </div>
-          <div className="metric-footer">Based on 6 active system metrics</div>
+          <div className="metric-footer">
+            Nodes persisted to knowledge graph
+          </div>
         </div>
 
         <div className="glass-card metric-card">
           <div className="metric-header">
-            <span className="metric-title">Active Telemetry Alerts</span>
-            <div className="metric-icon-wrap accent-red">
-              <AlertTriangle size={20} />
+            <span className="metric-title">Avg Chunks / Doc</span>
+            <div className="metric-icon-wrap accent-orange">
+              <Layers size={20} />
             </div>
           </div>
           <div className="metric-body">
-            <span className="metric-value">3</span>
-            <span className="metric-change negative">
-              1 Critical / 2 Warn
+            <span className="metric-value">
+              {loading || !stats?.documents
+                ? "--"
+                : Math.round((stats.chunks ?? 0) / stats.documents).toLocaleString()}
             </span>
-          </div>
-          <div className="metric-footer">Boiler-301 pressure exceeded limit</div>
-        </div>
-
-        <div className="glass-card metric-card">
-          <div className="metric-header">
-            <span className="metric-title">Compliance Integrity</span>
-            <div className="metric-icon-wrap accent-purple">
-              <Heart size={20} />
-            </div>
-          </div>
-          <div className="metric-body">
-            <span className="metric-value">92%</span>
             <span className="metric-change positive">
-              <TrendingUp size={14} /> +4% this month
+              <ArrowUpRight size={14} />
+              Per ingested document
             </span>
           </div>
-          <div className="metric-footer">Safety & SOP audit score</div>
-        </div>
-      </div>
-
-      {/* Charts Grid */}
-      <div className="charts-grid">
-        <div className="glass-card chart-container">
-          <div className="chart-header">
-            <div>
-              <h3>Steam Loop Telemetry</h3>
-              <p className="chart-sub">Real-time pressure vs temperature correlation</p>
-            </div>
-            <div className="legend-pills">
-              <span className="legend-pill pressure-pill">Pressure (PSI)</span>
-              <span className="legend-pill temp-pill">Temp (°C)</span>
-            </div>
-          </div>
-          <div className="chart-body">
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={telemetryData}>
-                <defs>
-                  <linearGradient id="colorPressure" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#aa3bff" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#aa3bff" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#c084fc" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#c084fc" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="time" stroke="var(--text)" fontSize={12} />
-                <YAxis stroke="var(--text)" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--card-bg)",
-                    borderColor: "var(--border)",
-                    color: "var(--text-h)",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="pressure"
-                  stroke="#aa3bff"
-                  fillOpacity={1}
-                  fill="url(#colorPressure)"
-                  strokeWidth={2}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="temp"
-                  stroke="#c084fc"
-                  fillOpacity={1}
-                  fill="url(#colorTemp)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="glass-card chart-container">
-          <div className="chart-header">
-            <div>
-              <h3>Monthly Industrial Incidents</h3>
-              <p className="chart-sub">Incidents recorded and resolved in 2026</p>
-            </div>
-          </div>
-          <div className="chart-body">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={incidentHistory}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" stroke="var(--text)" fontSize={12} />
-                <YAxis stroke="var(--text)" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--card-bg)",
-                    borderColor: "var(--border)",
-                    color: "var(--text-h)",
-                  }}
-                />
-                <Bar dataKey="count" fill="#aa3bff" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="metric-footer">
+            800-char sentence-aware chunks · 100-char overlap
           </div>
         </div>
       </div>
 
-      {/* Bottom Layout - Status and Actions */}
+      {/* ── Charts row — built from real activity data ── */}
+      {hasData ? (
+        <div className="charts-grid">
+
+          <div className="glass-card chart-container">
+            <div className="chart-header">
+              <div>
+                <h3>Chunks per Document</h3>
+                <p className="chart-sub">
+                  Vector segments extracted from each ingested PDF
+                </p>
+              </div>
+            </div>
+            <div className="chart-body">
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={chunkChart} margin={{ left: -10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="name" stroke="var(--text)" fontSize={11} />
+                  <YAxis stroke="var(--text)" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text-h)",
+                      fontSize: 13,
+                    }}
+                    formatter={(v: number) => [`${v} chunks`, "Chunks"]}
+                  />
+                  <Bar dataKey="chunks" radius={[4, 4, 0, 0]}>
+                    {chunkChart.map((_, i) => (
+                      <Cell
+                        key={i}
+                        fill={i % 2 === 0 ? "#aa3bff" : "#c084fc"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="glass-card chart-container">
+            <div className="chart-header">
+              <div>
+                <h3>Knowledge Base Growth</h3>
+                <p className="chart-sub">
+                  Cumulative vector chunks as documents were ingested
+                </p>
+              </div>
+            </div>
+            <div className="chart-body">
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={accumulationChart} margin={{ left: -10 }}>
+                  <defs>
+                    <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#aa3bff" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#aa3bff" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text)" fontSize={11} />
+                  <YAxis stroke="var(--text)" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text-h)",
+                      fontSize: 13,
+                    }}
+                    formatter={(v: number) => [`${v} total chunks`, "KB Total"]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    stroke="#aa3bff"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#totalGrad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      ) : (
+        !loading && (
+          <div className="glass-card charts-empty-state">
+            <Upload size={40} className="empty-icon" />
+            <h3>No data yet</h3>
+            <p>
+              Upload your first PDF on the <strong>Documents</strong> page.
+              Charts will populate automatically as documents are ingested.
+            </p>
+          </div>
+        )
+      )}
+
+      {/* ── Bottom row: documents table + activity feed ── */}
       <div className="bottom-dashboard-grid">
+
+        {/* Documents table */}
         <div className="glass-card table-section">
-          <h3>Active Operational Alerts</h3>
-          <div className="alert-list">
-            <div className="alert-item high-priority">
-              <span className="priority-badge">High</span>
-              <div className="alert-info">
-                <h4>Turbine-A Vibration Anomaly</h4>
-                <p>Telemetry recorded vibration at 4.2mm/s (limit 3.5mm/s). Run RCA.</p>
-              </div>
-              <span className="alert-time">10 mins ago</span>
-            </div>
-            <div className="alert-item warn-priority">
-              <span className="priority-badge">Warn</span>
-              <div className="alert-info">
-                <h4>Safety Audit Verification Missing</h4>
-                <p>Boiler inspection log missing signature block in PDF checklist.</p>
-              </div>
-              <span className="alert-time">2 hours ago</span>
-            </div>
-            <div className="alert-item info-priority">
-              <span className="priority-badge">Info</span>
-              <div className="alert-info">
-                <h4>Gemini Model Configuration Updated</h4>
-                <p>Switched system prompts to use RAG framework optimizations.</p>
-              </div>
-              <span className="alert-time">Yesterday</span>
-            </div>
+          <div className="section-header-row">
+            <h3>Ingested Documents</h3>
+            <button className="icon-btn" onClick={fetchData} title="Refresh">
+              <RefreshCw size={16} />
+            </button>
           </div>
+
+          {loading ? (
+            <div className="table-loader">
+              <div className="spinner" />
+              <span>Fetching from knowledge base...</span>
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="empty-docs">
+              <FileText size={32} className="empty-icon" />
+              <p>No documents ingested yet. Upload a PDF on the Documents page.</p>
+            </div>
+          ) : (
+            <table className="mini-doc-table">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Size</th>
+                  <th>Chunks</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {docs.map((doc) => {
+                  const event = activity.find((a) => a.filename === doc.name);
+                  return (
+                    <tr key={doc.name}>
+                      <td className="doc-name-cell">
+                        <FileText size={14} />
+                        <span>{doc.name}</span>
+                      </td>
+                      <td>{(doc.size / 1024).toFixed(1)} KB</td>
+                      <td>{event ? event.chunks : "--"}</td>
+                      <td>
+                        <span className="status-pill status-processed">
+                          <CheckCircle2 size={11} /> Active RAG
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
+
+        {/* Real activity feed */}
+        <div className="glass-card table-section">
+          <div className="section-header-row">
+            <h3>Ingestion Activity</h3>
+            <Network size={16} className="section-icon" />
+          </div>
+
+          {loading ? (
+            <div className="table-loader">
+              <div className="spinner" />
+              <span>Loading activity...</span>
+            </div>
+          ) : activity.length === 0 ? (
+            <div className="empty-docs">
+              <Clock size={32} className="empty-icon" />
+              <p>No activity yet. Upload documents to see the ingestion feed here.</p>
+            </div>
+          ) : (
+            <div className="alert-list">
+              {activity.map((event, i) => (
+                <div key={i} className="alert-item info-priority activity-row">
+                  <span className="priority-badge">
+                    <Upload size={11} />
+                  </span>
+                  <div className="alert-info">
+                    <h4>{event.filename}</h4>
+                    <p>
+                      {event.chunks} chunks · {formatBytes(event.size_kb)} ingested
+                    </p>
+                  </div>
+                  <span className="alert-time">
+                    {relativeTime(event.timestamp)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="dashboard-refresh-footer">
+        Last refreshed: {lastRefreshed.toLocaleTimeString()} · auto-refreshes every 30 s
       </div>
     </div>
   );

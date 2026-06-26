@@ -4,10 +4,10 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 
 const client = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface DocumentInfo {
   name: string;
@@ -16,29 +16,17 @@ export interface DocumentInfo {
   status: string;
 }
 
-
 export interface Source {
   file: string;
-  chunk?: number;
-  score?: number;
+  chunk: number;
+  confidence: number;   // 0–100 similarity score
   preview: string;
 }
-
-
-export interface LessonsResponse {
-  analysis: string;
-}
-
-
-
-
 
 export interface ChatResponse {
   answer: string;
   sources: Source[];
 }
-
-
 
 export interface ComplianceResponse {
   analysis: string;
@@ -48,11 +36,15 @@ export interface RCAResponse {
   analysis: string;
 }
 
+export interface LessonsResponse {
+  analysis: string;
+}
+
 export interface GraphNode {
   id: string;
   label: string;
   type: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface GraphEdge {
@@ -67,14 +59,37 @@ export interface GraphData {
   edges: GraphEdge[];
 }
 
+export interface SystemStats {
+  documents: number;
+  chunks: number;
+  equipment: number;
+}
+
+export interface UploadResult {
+  status: string;
+  filename: string;
+  chunks: number;
+  entities: Record<string, string[]>;
+}
+
+export interface ActivityEvent {
+  type: string;
+  filename: string;
+  size_kb: number;
+  chunks: number;
+  timestamp: number;
+}
+
+// ─── API client ─────────────────────────────────────────────────────────────
+
 export const api = {
-  uploadDocument: async (file: File): Promise<{ status: string; chunks: number; entities: string[] }> => {
+
+  // Documents
+  uploadDocument: async (file: File): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
     const response = await axios.post(`${API_BASE_URL}/upload`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
@@ -84,11 +99,26 @@ export const api = {
     return response.data;
   },
 
-  askCopilot: async (question: string): Promise<ChatResponse> => {
-    const response = await client.post<ChatResponse>("/chat", { question });
+  deleteDocument: async (filename: string): Promise<{ status: string; chunks_removed: number }> => {
+    const response = await client.delete(`/documents/${encodeURIComponent(filename)}`);
     return response.data;
   },
 
+  extractDocumentText: async (filename: string): Promise<{ filename: string; text: string }> => {
+    const response = await client.get<{ filename: string; text: string }>(`/extract-text/${encodeURIComponent(filename)}`);
+    return response.data;
+  },
+
+  // Copilot
+  askCopilot: async (question: string, sourceFilter?: string): Promise<ChatResponse> => {
+    const response = await client.post<ChatResponse>("/chat", {
+      question,
+      source_filter: sourceFilter ?? null,
+    });
+    return response.data;
+  },
+
+  // Compliance
   runComplianceCheck: async (documentText: string): Promise<ComplianceResponse> => {
     const response = await client.post<ComplianceResponse>("/compliance", {
       document_text: documentText,
@@ -96,11 +126,19 @@ export const api = {
     return response.data;
   },
 
+  // RCA
   runRCA: async (equipment: string, symptoms: string): Promise<RCAResponse> => {
     const response = await client.post<RCAResponse>("/rca", { equipment, symptoms });
     return response.data;
   },
 
+  // Lessons Learned
+  runLessons: async (query: string): Promise<LessonsResponse> => {
+    const response = await client.post<LessonsResponse>("/lessons", { query });
+    return response.data;
+  },
+
+  // Graph
   getGraphData: async (): Promise<GraphData> => {
     const response = await client.get<GraphData>("/graph");
     return response.data;
@@ -111,14 +149,15 @@ export const api = {
     return response.data;
   },
 
- runLessons: async (query: string): Promise<LessonsResponse> => {
-  const response = await client.post(
-    "/lessons",
-    {
-      query: query
-    }
-  );
+  // Stats
+  getStats: async (): Promise<SystemStats> => {
+    const response = await client.get<SystemStats>("/stats");
+    return response.data;
+  },
 
-  return response.data;
-},
+  // Activity
+  getActivity: async (): Promise<ActivityEvent[]> => {
+    const response = await client.get<ActivityEvent[]>("/activity");
+    return response.data;
+  },
 };

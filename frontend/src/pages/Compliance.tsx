@@ -1,176 +1,204 @@
 import { useState, useEffect } from "react";
 import { api, type DocumentInfo } from "../services/api";
-import { ShieldCheck, ShieldAlert, FileText, ClipboardCheck, AlertOctagon, HelpCircle } from "lucide-react";
+import {
+  ShieldCheck, ShieldAlert, FileText,
+  ClipboardCheck, AlertOctagon, HelpCircle, Loader2,
+} from "lucide-react";
 import { toast, Toaster } from "sonner";
 import "./Compliance.css";
 
-const MOCK_TEMPLATE_SOP = `STANDARD OPERATING PROCEDURE: STEAM BOILER STARTUP
-Tag: Boiler-301
-Location: Power Plant West
+// ── Markdown-aware audit report renderer ─────────────────────────────────────
+function formatAuditText(text: string) {
+  const lines = text.split("\n");
+  return lines.map((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={index} className="spacer-line" />;
 
-1. PURPOSE & SCOPE
-This document outlines standard parameters for lighting off Boiler-301 steam cycles. 
+    // Section headers  **1. Compliance Violations**
+    if (/^\*\*\d+\./.test(trimmed)) {
+      const label = trimmed.replace(/\*\*/g, "").trim();
+      const lower = label.toLowerCase();
 
-2. SAFETY REQUIREMENTS
-- Hearing protection required.
-- Fire suppression systems must be active. 
-- Warning: Never exceed 150 PSI before cooling feedwater loop is at temperature.
-- Note: Daily safety logs should be signed by shift supervisor.
+      let Icon = ClipboardCheck;
+      let cls = "audit-item-row";
 
-3. STARTUP SEQUENCE
-a. Verify feed pump loop is operational.
-b. Inspect pressure relief valve V-202 configuration.
-c. Initiate ignition cycle. If flame fail occurs, wait 5 minutes before restarting.
-`;
+      if (lower.includes("violation"))  { Icon = AlertOctagon;  cls += " error-item"; }
+      else if (lower.includes("missing") || lower.includes("gap")) { Icon = AlertOctagon; cls += " error-item"; }
+      else if (lower.includes("safety") || lower.includes("risk"))  { Icon = ShieldAlert; cls += " warn-item"; }
+      else if (lower.includes("observation"))                        { Icon = HelpCircle;  cls += " observation-item"; }
+      else if (lower.includes("recommend"))                          { Icon = ShieldCheck; cls += " ok-item"; }
 
+      return (
+        <div key={index} className={`audit-section-header ${cls}`}>
+          <Icon size={16} className="audit-li-icon" />
+          <h4>{label}</h4>
+        </div>
+      );
+    }
+
+    if (trimmed.startsWith("### ")) return <h4 key={index} className="audit-h4">{trimmed.slice(4)}</h4>;
+    if (trimmed.startsWith("## "))  return <h3 key={index} className="audit-h3">{trimmed.slice(3)}</h3>;
+
+    const cleanLine = trimmed.replace(/^[-•*]\s*/, "").replace(/^\d+\.\s*/, "").replace(/\*\*/g, "");
+    const lower = cleanLine.toLowerCase();
+
+    let icon = <ClipboardCheck className="audit-li-icon info" size={15} />;
+    let cls  = "audit-item-row";
+
+    if (lower.includes("violation") || lower.includes("missing") || lower.includes("critical")) {
+      icon = <AlertOctagon className="audit-li-icon error" size={15} />;
+      cls += " error-item";
+    } else if (lower.includes("safety") || lower.includes("concern") || lower.includes("warning") || lower.includes("risk")) {
+      icon = <ShieldAlert className="audit-li-icon warn" size={15} />;
+      cls += " warn-item";
+    } else if (lower.includes("observation") || lower.includes("note")) {
+      icon = <HelpCircle className="audit-li-icon observation" size={15} />;
+      cls += " observation-item";
+    } else if (lower.includes("recommend") || lower.includes("immediate") || lower.includes("should")) {
+      icon = <ShieldCheck className="audit-li-icon ok" size={15} />;
+      cls += " ok-item";
+    }
+
+    return (
+      <div key={index} className={cls}>
+        {icon}
+        <div className="audit-item-body">
+          <span className="item-content">{cleanLine}</span>
+        </div>
+      </div>
+    );
+  });
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 export default function Compliance() {
-  const [documents, setDocuments] = useState<DocumentInfo[]>([]);
-  const [selectedDocName, setSelectedDocName] = useState("");
-  const [rawText, setRawText] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [auditResult, setAuditResult] = useState<string | null>(null);
+  const [documents,        setDocuments]        = useState<DocumentInfo[]>([]);
+  const [selectedDocName,  setSelectedDocName]  = useState("");
+  const [rawText,          setRawText]          = useState("");
+  const [loadingText,      setLoadingText]      = useState(false);
+  const [loading,          setLoading]          = useState(false);
+  const [auditResult,      setAuditResult]      = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchDocs = async () => {
-      try {
-        const data = await api.getDocuments();
-        setDocuments(data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchDocs();
+    api.getDocuments()
+      .then(setDocuments)
+      .catch(console.error);
   }, []);
 
-  const handleSelectDoc = (name: string) => {
+  // When user selects a doc, fetch its extracted text from the backend
+  const handleSelectDoc = async (name: string) => {
     setSelectedDocName(name);
-    if (name === "boiler_sop_temp") {
-      setRawText(MOCK_TEMPLATE_SOP);
-    } else {
-      // Simulate reading or tell user to type/paste
-      setRawText(`-- CONTENT FROM DOC: ${name} --\n\n[System note: Analyze text contents of the document. Run the compliance check to vectorize and query this file's context against safety standards.]`);
+    setAuditResult(null);
+
+    if (!name) {
+      setRawText("");
+      return;
+    }
+
+    setLoadingText(true);
+    setRawText("");
+    try {
+      const result = await api.extractDocumentText(name);
+      setRawText(result.text);
+      toast.success(`Loaded "${name}" — ${result.text.length.toLocaleString()} characters`);
+    } catch {
+      toast.error(`Failed to extract text from "${name}".`);
+      setRawText("");
+    } finally {
+      setLoadingText(false);
     }
   };
 
   const handleRunAudit = async () => {
     if (!rawText.trim()) {
-      toast.warning("Please paste SOP document text first.");
+      toast.warning("Load a document or paste text first.");
       return;
     }
 
     setLoading(true);
     setAuditResult(null);
-    toast.info("Auditing document text against safety guidelines...");
 
     try {
       const res = await api.runComplianceCheck(rawText);
       setAuditResult(res.analysis);
-      toast.success("Audit complete!");
-    } catch (err) {
-      console.error(err);
-      toast.error("Compliance audit failed. Verify backend services.");
+      toast.success("Compliance audit complete");
+    } catch {
+      toast.error("Compliance audit failed. Check backend connection.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Convert markdown-style numbered lists/headers to visual HTML items
-  const formatAuditText = (text: string) => {
-    const lines = text.split("\n");
-    return lines.map((line, index) => {
-      const trimmed = line.trim();
-      if (!trimmed) return <div key={index} className="spacer-line" />;
-
-      // Header matching
-      if (trimmed.startsWith("###")) {
-        return <h4 key={index} className="audit-h4">{trimmed.replace("###", "").trim()}</h4>;
-      }
-      if (trimmed.startsWith("##")) {
-        return <h3 key={index} className="audit-h3">{trimmed.replace("##", "").trim()}</h3>;
-      }
-      if (trimmed.startsWith("#")) {
-        return <h2 key={index} className="audit-h2">{trimmed.replace("#", "").trim()}</h2>;
-      }
-
-      // Check for bulleted/numbered items with specific keyword alerts
-      const lower = trimmed.toLowerCase();
-      let icon = <ClipboardCheck className="audit-li-icon info" size={16} />;
-      let itemClass = "audit-item-row";
-
-      if (lower.includes("violation") || lower.includes("missing") || lower.includes("critical")) {
-        icon = <AlertOctagon className="audit-li-icon error" size={16} />;
-        itemClass += " error-item";
-      } else if (lower.includes("safety") || lower.includes("concern") || lower.includes("warning")) {
-        icon = <ShieldAlert className="audit-li-icon warn" size={16} />;
-        itemClass += " warn-item";
-      } else if (lower.includes("observation") || lower.includes("audit")) {
-        icon = <HelpCircle className="audit-li-icon observation" size={16} />;
-        itemClass += " observation-item";
-      }
-
-      // Strip leading bullets/numbers
-      const cleanLine = trimmed.replace(/^(\d+\.|\*|-)\s*/, "");
-
-      return (
-        <div key={index} className={itemClass}>
-          {icon}
-          <div className="audit-item-body">
-            {trimmed.match(/^(\d+\.)/) && <span className="item-number">{trimmed.match(/^(\d+\.)/)?.[0]}</span>}
-            <span className="item-content">{cleanLine}</span>
-          </div>
-        </div>
-      );
-    });
-  };
-
   return (
     <div className="page-container compliance-page">
       <Toaster position="top-right" richColors />
+
       <div className="compliance-layout">
-        {/* Left Side: Inputs */}
+
+        {/* ── Left: input form ── */}
         <div className="glass-card audit-form-section">
           <h3>SOP Audit Form</h3>
           <p className="section-desc">
-            Load an ingested document or paste a custom Standard Operating Procedure (SOP) below.
+            Select an ingested document to auto-load its text, or paste any SOP / procedure text below.
+            PlantMind will audit it against regulatory standards in your knowledge base.
           </p>
 
           <div className="form-group">
-            <label htmlFor="doc-selector">Ingested Document Template</label>
+            <label htmlFor="doc-selector">Load from Ingested Document</label>
             <select
               id="doc-selector"
               value={selectedDocName}
               onChange={(e) => handleSelectDoc(e.target.value)}
+              disabled={loadingText}
             >
-              <option value="">-- Copy text or select template --</option>
-              <option value="boiler_sop_temp">Boiler-301 Startup SOP Template</option>
-              {documents.map((doc, idx) => (
-                <option key={idx} value={doc.name}>
-                  {doc.name}
-                </option>
-              ))}
+              <option value="">— Select an ingested PDF —</option>
+              {documents.length === 0 ? (
+                <option disabled>No documents uploaded yet</option>
+              ) : (
+                documents.map((doc) => (
+                  <option key={doc.name} value={doc.name}>
+                    {doc.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
+          {loadingText && (
+            <div className="text-loading-row">
+              <Loader2 size={16} className="spin-icon" />
+              <span>Extracting text from PDF...</span>
+            </div>
+          )}
+
           <div className="form-group">
-            <label htmlFor="sop-text">Document Content (Text)</label>
+            <label htmlFor="sop-text">
+              Document Content
+              {rawText && (
+                <span className="char-count">
+                  {rawText.length.toLocaleString()} chars
+                </span>
+              )}
+            </label>
             <textarea
               id="sop-text"
               rows={15}
-              placeholder="Paste SOP instructions, safety limits, piping plans or maintenance schedules here..."
+              placeholder="Select a document above to auto-load its text, or paste any SOP / maintenance procedure here..."
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
+              disabled={loadingText}
             />
           </div>
 
           <button
             className="audit-btn"
             onClick={handleRunAudit}
-            disabled={loading || !rawText.trim()}
+            disabled={loading || loadingText || !rawText.trim()}
           >
             {loading ? (
               <>
-                <div className="spinner"></div>
-                <span>Analyzing safety protocols...</span>
+                <div className="spinner" />
+                <span>Analyzing against safety guidelines...</span>
               </>
             ) : (
               <>
@@ -181,35 +209,42 @@ export default function Compliance() {
           </button>
         </div>
 
-        {/* Right Side: Results */}
+        {/* ── Right: results ── */}
         <div className="glass-card audit-results-section">
-          <h3>Audit Results & Analysis</h3>
-          <p className="section-desc">Real-time breakdown of violations, safety checks, and recommendations.</p>
+          <h3>Audit Results &amp; Analysis</h3>
+          <p className="section-desc">
+            Violations, safety concerns, documentation gaps, and prioritised recommendations
+            cross-referenced against your regulatory knowledge base.
+          </p>
 
           {loading ? (
             <div className="results-loader">
               <div className="pulsing-radar">
-                <span></span>
-                <span></span>
+                <span /><span />
               </div>
-              <p>Gemini LLM analyzing documentation against regulatory guidelines...</p>
+              <p>Gemini LLM auditing document against regulatory guidelines...</p>
             </div>
           ) : auditResult ? (
             <div className="audit-results-content animate-fade-in">
               <div className="audit-success-banner">
                 <ShieldCheck size={20} className="success-banner-icon" />
                 <div>
-                  <h4>Audit Completed Successfully</h4>
-                  <p>Check the observations and checklist report details below.</p>
+                  <h4>Audit Completed</h4>
+                  <p>Review violations and implement recommendations below.</p>
                 </div>
               </div>
-              <div className="formatted-audit-report">{formatAuditText(auditResult)}</div>
+              <div className="formatted-audit-report">
+                {formatAuditText(auditResult)}
+              </div>
             </div>
           ) : (
             <div className="results-empty-state">
               <FileText size={48} className="empty-icon" />
               <h4>Ready for Verification</h4>
-              <p>Load or paste text on the left and run the audit. The results will populate here.</p>
+              <p>
+                Load a document or paste text on the left, then click
+                <strong> Execute Compliance Audit</strong>.
+              </p>
             </div>
           )}
         </div>

@@ -170,12 +170,17 @@ export default function KnowledgeGraph() {
           <div className="glass-card flow-viewer-container">
             {loading ? (
               <div className="graph-loader">
-                <div className="spinner"></div>
-
-                <span>
-                  Loading graph
-                  entities...
-                </span>
+                <div className="spinner" />
+                <span>Loading graph entities...</span>
+              </div>
+            ) : nodes.length === 0 ? (
+              <div className="graph-empty-state">
+                <Network size={52} className="empty-icon" />
+                <h4>Knowledge Graph Empty</h4>
+                <p>
+                  Upload documents on the <strong>Documents</strong> page.
+                  Equipment entities extracted from PDFs will appear here automatically.
+                </p>
               </div>
             ) : (
               <div className="react-flow-wrapper">

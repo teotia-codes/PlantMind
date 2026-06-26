@@ -13,6 +13,8 @@ import "./Copilot.css";
 interface Source {
   file: string;
   preview: string;
+  confidence?: number;
+  chunk?: number;
 }
 
 interface ChatMessage {
@@ -101,6 +103,12 @@ export default function Copilot() {
                 preview:
                   source.preview ||
                   "",
+
+                confidence:
+                  source.confidence,
+
+                chunk:
+                  source.chunk,
               };
             }
           );
@@ -252,17 +260,18 @@ export default function Copilot() {
                                   }
                                   className="source-item"
                                 >
-                                  <strong>
-                                    {
-                                      src.file
-                                    }
-                                  </strong>
-
-                                  <p className="source-text">
-                                    {
-                                      src.preview
-                                    }
-                                  </p>
+                                  <div className="source-header">
+                                    <strong className="source-filename">{src.file}</strong>
+                                    {src.confidence !== undefined && (
+                                      <span className={`source-confidence ${
+                                        src.confidence >= 75 ? "conf-high" :
+                                        src.confidence >= 50 ? "conf-mid" : "conf-low"
+                                      }`}>
+                                        {src.confidence}% match
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="source-text">{src.preview}</p>
                                 </div>
                               )
                             )}

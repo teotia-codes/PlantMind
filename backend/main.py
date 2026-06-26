@@ -1,32 +1,23 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import os
 import shutil
 
-from rag.pdf_processor import extract_text_from_pdf
-from rag.text_chunker import chunk_text
-
-from rag.chroma_service import (
-    store_chunks,
-    search_chunks,
-    collection
-)
-
+from rag.pdf_processor   import extract_text_from_pdf
+from rag.text_chunker    import chunk_text
+from rag.chroma_service  import store_chunks, search_chunks, collection, delete_document
 from rag.entity_extractor import extract_entities
-from rag.graph_service import (
-    save_equipment,
-    driver
+from rag.graph_service   import save_equipment, get_graph_data, get_equipment_count, driver
+from rag.gemini_service  import generate_answer
+
+# ────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="PlantMind AI",
+    description="Industrial Knowledge Intelligence Platform",
+    version="1.0.0",
 )
-
-from rag.gemini_service import generate_answer
-
-app = FastAPI()
-
-# -----------------------------------
-# CORS
-# -----------------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,19 +27,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -----------------------------------
-# Upload folder
-# -----------------------------------
-
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# -----------------------------------
-# Models
-# -----------------------------------
+
+# ────────────────────────────────────────────────────────────
+# Request / Response models
+# ────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     question: str
+    source_filter: str | None = None   # optional: restrict to one document
 
 
 class RCARequest(BaseModel):
@@ -64,419 +53,426 @@ class LessonsRequest(BaseModel):
     query: str
 
 
-# -----------------------------------
-# Home
-# -----------------------------------
+# ────────────────────────────────────────────────────────────
+# Health
+# ────────────────────────────────────────────────────────────
 
-@app.get("/")
+@app.get("/", tags=["health"])
 def home():
-    return {
-        "message": "PlantMind Backend Running"
-    }
+    return {"message": "PlantMind Backend Running", "version": "1.0.0"}
 
 
-# -----------------------------------
-# Upload PDF
-# -----------------------------------
+# ────────────────────────────────────────────────────────────
+# Documents
+# ────────────────────────────────────────────────────────────
 
-@app.post("/upload")
-async def upload_pdf(
-    file: UploadFile = File(...)
-):
+@app.post("/upload", tags=["documents"])
+async def upload_pdf(file: UploadFile = File(...)):
+    """
+    Ingest a PDF into the RAG pipeline:
+      1. Save file to disk
+      2. Extract text (page by page with page numbers)
+      3. Chunk into sentence-aware segments
+      4. Embed and store in ChromaDB with source metadata
+      5. Extract entities (equipment, pressures, regulations, …)
+      6. Save equipment nodes to Neo4j + local sidecar
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    file_path = os.path.join(
-        UPLOAD_DIR,
-        file.filename
-    )
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
 
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(
-            file.file,
-            buffer
+        shutil.copyfileobj(file.file, buffer)
+
+    text = extract_text_from_pdf(file_path)
+
+    if not text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Could not extract text from this PDF. It may be a scanned image-only document.",
         )
 
-    text = extract_text_from_pdf(
-        file_path
-    )
-
     chunks = chunk_text(text)
-
-    store_chunks(
-        chunks,
-        file.filename
-    )
-
+    stored = store_chunks(chunks, file.filename)
     entities = extract_entities(text)
 
-    equipment_nodes = entities.get(
-        "equipment",
-        []
-    )
-
-    save_equipment(
-        equipment_nodes
-    )
+    save_equipment(entities.get("equipment", []))
 
     return {
-        "status": "success",
+        "status":   "success",
         "filename": file.filename,
-        "chunks": len(chunks),
-        "entities": entities
+        "chunks":   stored,
+        "entities": entities,
     }
 
 
-# -----------------------------------
-# Documents
-# -----------------------------------
-
-@app.get("/documents")
+@app.get("/documents", tags=["documents"])
 def documents():
-
+    """List all ingested PDF files."""
     docs = []
+    if not os.path.exists(UPLOAD_DIR):
+        return docs
 
-    for file in os.listdir(
-        UPLOAD_DIR
-    ):
-
-        path = os.path.join(
-            UPLOAD_DIR,
-            file
-        )
-
-        docs.append({
-            "name": file,
-            "size": os.path.getsize(path),
-            "path": path,
-            "status": "processed"
-        })
-
+    for filename in os.listdir(UPLOAD_DIR):
+        path = os.path.join(UPLOAD_DIR, filename)
+        if os.path.isfile(path) and filename.lower().endswith(".pdf"):
+            docs.append({
+                "name":   filename,
+                "size":   os.path.getsize(path),
+                "path":   path,
+                "status": "processed",
+            })
     return docs
 
 
-# -----------------------------------
-# Chat
-# -----------------------------------
+@app.delete("/documents/{filename}", tags=["documents"])
+def delete_document_endpoint(filename: str):
+    """
+    Remove a document from disk and purge its chunks from ChromaDB.
+    """
+    file_path = os.path.join(UPLOAD_DIR, filename)
 
-@app.post("/chat")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Document '{filename}' not found.")
+
+    removed_chunks = delete_document(filename)
+    os.remove(file_path)
+
+    return {
+        "status":         "deleted",
+        "filename":       filename,
+        "chunks_removed": removed_chunks,
+    }
+
+
+# ────────────────────────────────────────────────────────────
+# Copilot — RAG Chat
+# ────────────────────────────────────────────────────────────
+
+@app.post("/chat", tags=["copilot"])
 def chat(req: ChatRequest):
-
+    """
+    Answer a question using RAG over ingested documents.
+    Optionally filter to a single source file.
+    Returns the answer plus source citations with confidence scores.
+    """
     results = search_chunks(
-        req.question
+        req.question,
+        n_results=5,
+        source_filter=req.source_filter,
     )
 
-    documents = results.get(
-        "documents",
-        []
-    )
+    raw_docs      = results.get("documents", [[]])[0]
+    raw_metadatas = results.get("metadatas",  [[]])[0]
+    raw_distances = results.get("distances",  [[]])[0]
 
-    metadatas = results.get(
-        "metadatas",
-        []
-    )
-
-    if not documents or not documents[0]:
+    if not raw_docs:
         return {
-            "answer":
-            "No relevant information found in uploaded documents.",
-            "sources": []
+            "answer":  "No relevant information found in the uploaded documents.",
+            "sources": [],
         }
 
-    docs = documents[0]
-
-    metadata = (
-        metadatas[0]
-        if metadatas
-        else []
-    )
-
-    context = "\n\n".join(
-        docs
-    )
-
-    answer = generate_answer(
-        context,
-        req.question
-    )
+    context = "\n\n".join(raw_docs)
+    answer  = generate_answer(context, req.question)
 
     sources = []
-
-    for i, doc in enumerate(docs):
-
-        meta = (
-            metadata[i]
-            if i < len(metadata)
-            else {}
-        )
-
+    for doc, meta, dist in zip(raw_docs, raw_metadatas, raw_distances):
+        # cosine distance → similarity score 0-100%
+        confidence = round((1.0 - float(dist)) * 100, 1)
         sources.append({
-            "file":
-            meta.get(
-                "source",
-                "unknown"
-            ),
-
-            "chunk":
-            meta.get(
-                "chunk_index",
-                -1
-            ),
-
-            "preview":
-            doc[:200] + "..."
+            "file":       meta.get("source",      "unknown"),
+            "chunk":      meta.get("chunk_index", -1),
+            "confidence": confidence,
+            "preview":    doc[:250] + ("..." if len(doc) > 250 else ""),
         })
 
-    return {
-        "answer": answer,
-        "sources": sources
-    }
+    return {"answer": answer, "sources": sources}
 
 
-# -----------------------------------
-# RCA
-# -----------------------------------
+# ────────────────────────────────────────────────────────────
+# Root Cause Analysis
+# ────────────────────────────────────────────────────────────
 
-@app.post("/rca")
+@app.post("/rca", tags=["rca"])
 def rca(req: RCARequest):
+    """
+    Generate a structured Root Cause Analysis report.
+    Retrieves relevant chunks from the knowledge base to ground the analysis.
+    """
+    rag_query = f"{req.equipment} {req.symptoms} failure maintenance root cause"
 
-    rag_query = (
-        f"{req.equipment} "
-        f"{req.symptoms} "
-        f"failure maintenance"
+    results  = search_chunks(rag_query, n_results=5)
+    docs     = results.get("documents", [[]])[0]
+    rag_context = "\n\n".join(docs) if docs else ""
+
+    prompt = f"""You are a senior industrial maintenance engineer with 20+ years of experience.
+
+Equipment Tag   : {req.equipment}
+Reported Symptoms: {req.symptoms}
+
+Using the knowledge base context below, generate a structured Root Cause Analysis (RCA) report.
+
+---KNOWLEDGE BASE CONTEXT---
+{rag_context}
+---END CONTEXT---
+
+Structure your response EXACTLY as follows:
+
+**1. Likely Root Cause**
+<concise technical explanation>
+
+**2. Confidence Level**
+<percentage and brief rationale — e.g. "85% — supported by bearing temperature data in SOP-12">
+
+**3. Recommended Inspections**
+- <actionable inspection step>
+- <actionable inspection step>
+
+**4. Corrective Actions**
+- <corrective action>
+- <corrective action>
+
+**5. Long-Term Prevention Strategy**
+<paragraph summarising systemic improvements to avoid recurrence>
+
+If the knowledge base context does not contain relevant information for a section, state "Not specified in uploaded documents" for that section only."""
+
+    answer = generate_answer(rag_context, prompt)
+    return {"analysis": answer}
+
+
+# ────────────────────────────────────────────────────────────
+# Compliance Audit
+# ────────────────────────────────────────────────────────────
+
+@app.post("/compliance", tags=["compliance"])
+def compliance(req: ComplianceRequest):
+    """
+    Audit a pasted SOP / procedure document against regulatory knowledge.
+    Uses the knowledge base to cross-reference relevant standards.
+    """
+    # Search the knowledge base for relevant regulatory context
+    results = search_chunks(req.document_text[:500], n_results=5)
+    kb_docs = results.get("documents", [[]])[0]
+    kb_context = "\n\n".join(kb_docs) if kb_docs else "No additional regulatory context found."
+
+    # The DOCUMENT UNDER REVIEW is the context; the KB enriches it
+    full_context = (
+        f"---DOCUMENT UNDER REVIEW---\n{req.document_text}\n\n"
+        f"---KNOWLEDGE BASE REFERENCES---\n{kb_context}"
     )
 
-    results = search_chunks(
-        rag_query
-    )
+    question = """Perform a compliance audit on the document above.
 
-    docs = (
-        results["documents"][0]
-        if results.get("documents")
-        else []
-    )
+Structure your response EXACTLY as follows:
 
-    rag_context = "\n\n".join(
-        docs
-    )
+**1. Compliance Violations**
+List each violation with the specific clause or standard it breaches.
 
-    prompt = f"""
-Equipment:
-{req.equipment}
+**2. Missing Records / Documentation Gaps**
+List mandatory records that are absent or incomplete.
 
-Symptoms:
-{req.symptoms}
+**3. Safety Concerns**
+List any safety risks identified, referencing specific lines from the document.
 
-Provide:
+**4. Audit Observations**
+General observations about documentation quality and completeness.
 
-1. Root Cause
+**5. Recommendations**
+Prioritised list of corrective actions with suggested timeline (Immediate / 30 days / 90 days).
 
-2. Confidence Level
+If a category has no findings, write "No issues identified." Do not invent violations."""
 
-3. Recommended Inspection
-
-4. Corrective Action
-
-5. Prevention Strategy
-"""
-
-    answer = generate_answer(
-        rag_context,
-        prompt
-    )
-
-    return {
-        "analysis": answer
-    }
+    answer = generate_answer(full_context, question)
+    return {"analysis": answer}
 
 
-# -----------------------------------
-# Compliance
-# -----------------------------------
-
-@app.post("/compliance")
-def compliance(
-    req: ComplianceRequest
-):
-
-    results = search_chunks(
-        req.document_text
-    )
-
-    docs = (
-        results["documents"][0]
-        if results.get("documents")
-        else []
-    )
-
-    context = "\n\n".join(
-        docs
-    )
-
-    prompt = f"""
-Compliance Review
-
-Document:
-
-{req.document_text}
-
-Identify:
-
-1. Violations
-
-2. Missing Records
-
-3. Risks
-
-4. Recommendations
-"""
-
-    answer = generate_answer(
-        context,
-        prompt
-    )
-
-    return {
-        "analysis": answer
-    }
-
-
-# -----------------------------------
+# ────────────────────────────────────────────────────────────
 # Lessons Learned
-# -----------------------------------
+# ────────────────────────────────────────────────────────────
 
-@app.post("/lessons")
-def lessons(
-    req: LessonsRequest
-):
+@app.post("/lessons", tags=["lessons"])
+def lessons(req: LessonsRequest):
+    """
+    Mine the knowledge base for historical failure patterns and lessons learned
+    relevant to the supplied query.
+    """
+    results  = search_chunks(req.query, n_results=6)
+    docs     = results.get("documents", [[]])[0]
+    context  = "\n\n".join(docs) if docs else ""
 
-    results = search_chunks(
-        req.query
-    )
+    prompt = f"""You are an industrial safety and reliability engineer.
 
-    docs = (
-        results["documents"][0]
-        if results.get("documents")
-        else []
-    )
+Query: {req.query}
 
-    context = "\n\n".join(
-        docs
-    )
+Using the knowledge base context below, produce a Lessons Learned report.
 
-    prompt = f"""
-Analyze:
+---KNOWLEDGE BASE CONTEXT---
+{context}
+---END CONTEXT---
 
-{req.query}
+Structure your response EXACTLY as follows:
 
-Using the supplied context.
+**1. Key Lessons Learned**
+- <lesson>
 
-Provide:
+**2. Recurring Failure Patterns Identified**
+- <pattern>
 
-1. Lessons Learned
+**3. Preventive Measures**
+- <measure>
 
-2. Similar Failure Patterns
+**4. Proactive Warnings for Similar Conditions**
+- <warning>
 
-3. Preventive Measures
+**5. Industry Best Practices**
+- <best practice>
 
-4. Future Warnings
+Ground every point in the knowledge base context. If insufficient data exists for a section, state "Insufficient historical data in knowledge base for this category." """
 
-5. Best Practices
-"""
-
-    answer = generate_answer(
-        context,
-        prompt
-    )
-
-    return {
-        "analysis": answer
-    }
+    answer = generate_answer(context, prompt)
+    return {"analysis": answer}
 
 
-# -----------------------------------
-# Equipment
-# -----------------------------------
+# ────────────────────────────────────────────────────────────
+# Knowledge Graph
+# ────────────────────────────────────────────────────────────
 
-@app.get("/equipment")
-def equipment():
-
-    equipment_list = []
-
-    try:
-
-        with driver.session() as session:
-
-            result = session.run(
-                """
-                MATCH (e:Equipment)
-                RETURN e.name AS name
-                """
-            )
-
-            equipment_list = [
-                row["name"]
-                for row in result
-            ]
-
-    except Exception as e:
-        print(e)
-
-    return equipment_list
-
-
-# -----------------------------------
-# Graph
-# -----------------------------------
-
-@app.get("/graph")
+@app.get("/graph", tags=["graph"])
 def graph():
+    """
+    Return equipment nodes and relationships.
+    Priority: Neo4j → local JSON sidecar → hardcoded demo graph.
+    Never returns an error to the frontend.
+    """
     return get_graph_data()
 
 
-# -----------------------------------
-# Stats
-# -----------------------------------
+@app.get("/equipment", tags=["graph"])
+def equipment():
+    """List all equipment tags extracted from uploaded documents."""
+    try:
+        with driver.session() as session:
+            result = session.run(
+                "MATCH (e:Equipment) RETURN e.name AS name"
+            )
+            return [row["name"] for row in result]
+    except Exception:
+        # fall back to sidecar node IDs
+        from rag.graph_service import _load_sidecar
+        sidecar = _load_sidecar()
+        return [n["id"] for n in sidecar.get("nodes", [])]
 
-@app.get("/stats")
+
+# ────────────────────────────────────────────────────────────
+# Stats  (wired to Dashboard)
+# ────────────────────────────────────────────────────────────
+
+@app.get("/stats", tags=["health"])
 def stats():
+    """
+    Real-time system statistics for the Dashboard.
+    Returns document count, vector chunk count, and equipment node count.
+    Falls back gracefully if any service is unavailable.
+    """
+    doc_count   = 0
+    chunk_count = 0
+    equip_count = 0
 
     try:
+        doc_count = len([
+            f for f in os.listdir(UPLOAD_DIR)
+            if f.lower().endswith(".pdf")
+        ])
+    except Exception:
+        pass
 
-        doc_count = len(
-            os.listdir(UPLOAD_DIR)
-        )
+    try:
+        chunk_count = collection.count()
+    except Exception:
+        pass
 
-        chunk_count = (
-            collection.count()
-        )
+    try:
+        equip_count = get_equipment_count()
+    except Exception:
+        pass
 
-        equipment_count = 0
+    return {
+        "documents": doc_count,
+        "chunks":    chunk_count,
+        "equipment": equip_count,
+    }
 
-        with driver.session() as session:
 
-            result = session.run(
-                """
-                MATCH (e:Equipment)
-                RETURN count(e) AS total
-                """
-            )
+# ────────────────────────────────────────────────────────────
+# Activity Feed  (real events from uploads)
+# ────────────────────────────────────────────────────────────
 
-            equipment_count = result.single()[
-                "total"
-            ]
+@app.get("/activity", tags=["health"])
+def activity():
+    """
+    Return a real activity feed derived from ingested documents.
+    Each entry is built from actual file metadata + ChromaDB chunk counts.
+    No hardcoded events — if nothing is uploaded, the list is empty.
+    """
+    events = []
 
-        return {
-            "documents":
-            doc_count,
+    try:
+        files = [
+            f for f in os.listdir(UPLOAD_DIR)
+            if f.lower().endswith(".pdf")
+        ]
 
-            "chunks":
-            chunk_count,
+        for filename in sorted(
+            files,
+            key=lambda f: os.path.getmtime(os.path.join(UPLOAD_DIR, f)),
+            reverse=True,
+        )[:10]:   # most recent 10
+            path  = os.path.join(UPLOAD_DIR, filename)
+            mtime = os.path.getmtime(path)
+            size  = os.path.getsize(path)
 
-            "equipment":
-            equipment_count
-        }
+            # count chunks belonging to this file
+            try:
+                res = collection.get(
+                    where={"source": filename},
+                    include=["documents"],
+                )
+                chunk_count = len(res.get("ids", []))
+            except Exception:
+                chunk_count = 0
+
+            events.append({
+                "type":        "upload",
+                "filename":    filename,
+                "size_kb":     round(size / 1024, 1),
+                "chunks":      chunk_count,
+                "timestamp":   mtime,         # Unix seconds
+            })
 
     except Exception as e:
+        print(f"[activity] error: {e}")
 
-        return {
-            "error": str(e)
-        }
+    return events
+
+
+# ────────────────────────────────────────────────────────────
+# Extract raw text from an already-ingested file
+# (used by Compliance page to pre-fill the text area)
+# ────────────────────────────────────────────────────────────
+
+@app.get("/extract-text/{filename}", tags=["documents"])
+def extract_text_endpoint(filename: str):
+    """
+    Return the extracted plain text of a previously uploaded PDF.
+    The Compliance page uses this to pre-populate the audit textarea
+    without requiring the user to paste text manually.
+    """
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"'{filename}' not found.")
+
+    text = extract_text_from_pdf(file_path)
+    return {"filename": filename, "text": text}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { api, type DocumentInfo } from "../services/api";
-import { Upload, FileText, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Upload, FileText, CheckCircle2, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import "./Documents.css";
 
@@ -25,6 +25,18 @@ export default function Documents() {
       toast.error("Failed to load documents.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteDocument = async (filename: string) => {
+    if (!window.confirm(`Delete "${filename}" and remove all its vector chunks?`)) return;
+    try {
+      const result = await api.deleteDocument(filename);
+      toast.success(`Deleted "${filename}" — ${result.chunks_removed} chunks removed from knowledge base.`);
+      fetchDocuments();
+    } catch (err) {
+      console.error(err);
+      toast.error(`Failed to delete "${filename}".`);
     }
   };
 
@@ -73,7 +85,7 @@ export default function Documents() {
       setUploadStatus("success");
       setStats({
         chunks: res.chunks,
-        entities: res.entities || [],
+        entities: res.entities ? Object.values(res.entities).flat() : [],
       });
       toast.success(`${file.name} successfully ingested!`);
       fetchDocuments();
@@ -208,6 +220,7 @@ export default function Documents() {
                     <th>Size</th>
                     <th>Storage Index</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,6 +236,15 @@ export default function Documents() {
                       </td>
                       <td>
                         <span className="status-pill status-processed">Active RAG</span>
+                      </td>
+                      <td>
+                        <button
+                          className="delete-doc-btn"
+                          onClick={() => handleDeleteDocument(doc.name)}
+                          title="Delete document"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))}

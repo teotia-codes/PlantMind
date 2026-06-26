@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    {
+      "id": "PUMP P-101",
+      "label": "PUMP P-101",
+      "type": "equipment"
+    },
+    {
+      "id": "Pump P-101",
+      "label": "Pump P-101",
+      "type": "equipment"
+    }
+  ],
+  "edges": []
+}
