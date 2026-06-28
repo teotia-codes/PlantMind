@@ -3,13 +3,287 @@
     {
       "id": "PUMP P-101",
       "label": "PUMP P-101",
-      "type": "equipment"
+      "type": "equipment",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "neighbors": [
+          "Pump P.Pdf",
+          "12 Bar",
+          "16 Bar",
+          "85 C",
+          "Preventive Maintenance",
+          "Inspection",
+          "Lubrication",
+          "Seal Inspection",
+          "Bearing Inspection",
+          "Alignment"
+        ],
+        "degree": 10,
+        "relationships": 11
+      }
     },
     {
       "id": "Pump P-101",
       "label": "Pump P-101",
       "type": "equipment"
+    },
+    {
+      "id": "Plant Safety Compliance Standard.Pdf",
+      "label": "Plant Safety Compliance Standard.Pdf",
+      "type": "document",
+      "metadata": {
+        "documents": [],
+        "degree": 0,
+        "relationships": 0,
+        "neighbors": []
+      }
+    },
+    {
+      "id": "Oisd 117",
+      "label": "Oisd 117",
+      "type": "regulation",
+      "metadata": {
+        "documents": [],
+        "degree": 0,
+        "relationships": 0,
+        "neighbors": []
+      }
+    },
+    {
+      "id": "Api 610",
+      "label": "Api 610",
+      "type": "regulation",
+      "metadata": {
+        "documents": [],
+        "degree": 0,
+        "relationships": 0,
+        "neighbors": []
+      }
+    },
+    {
+      "id": "Inspection",
+      "label": "Inspection",
+      "type": "maintenance",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "Calibration",
+      "label": "Calibration",
+      "type": "maintenance",
+      "metadata": {
+        "documents": [],
+        "degree": 0,
+        "relationships": 0,
+        "neighbors": []
+      }
+    },
+    {
+      "id": "Pump P.Pdf",
+      "label": "Pump P.Pdf",
+      "type": "document",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "12 Bar",
+      "label": "12 Bar",
+      "type": "pressure",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "16 Bar",
+      "label": "16 Bar",
+      "type": "pressure",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "85 C",
+      "label": "85 C",
+      "type": "temperature",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "Preventive Maintenance",
+      "label": "Preventive Maintenance",
+      "type": "maintenance",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "Lubrication",
+      "label": "Lubrication",
+      "type": "maintenance",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "Seal Inspection",
+      "label": "Seal Inspection",
+      "type": "maintenance",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "Bearing Inspection",
+      "label": "Bearing Inspection",
+      "type": "maintenance",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
+    },
+    {
+      "id": "Alignment",
+      "label": "Alignment",
+      "type": "maintenance",
+      "metadata": {
+        "documents": [
+          "PUMP P.pdf"
+        ],
+        "degree": 1,
+        "relationships": 2,
+        "neighbors": [
+          "Pump P-101"
+        ]
+      }
     }
   ],
-  "edges": []
+  "edges": [
+    {
+      "id": "Pump P-101_MENTIONED_IN_Pump P.Pdf",
+      "source": "Pump P-101",
+      "target": "Pump P.Pdf",
+      "label": "MENTIONED_IN"
+    },
+    {
+      "id": "Pump P-101_HAS_PRESSURE_12 Bar",
+      "source": "Pump P-101",
+      "target": "12 Bar",
+      "label": "HAS_PRESSURE"
+    },
+    {
+      "id": "Pump P-101_HAS_PRESSURE_16 Bar",
+      "source": "Pump P-101",
+      "target": "16 Bar",
+      "label": "HAS_PRESSURE"
+    },
+    {
+      "id": "Pump P-101_HAS_TEMPERATURE_85 C",
+      "source": "Pump P-101",
+      "target": "85 C",
+      "label": "HAS_TEMPERATURE"
+    },
+    {
+      "id": "Pump P-101_REQUIRES_Preventive Maintenance",
+      "source": "Pump P-101",
+      "target": "Preventive Maintenance",
+      "label": "REQUIRES"
+    },
+    {
+      "id": "Pump P-101_REQUIRES_Inspection",
+      "source": "Pump P-101",
+      "target": "Inspection",
+      "label": "REQUIRES"
+    },
+    {
+      "id": "Pump P-101_REQUIRES_Lubrication",
+      "source": "Pump P-101",
+      "target": "Lubrication",
+      "label": "REQUIRES"
+    },
+    {
+      "id": "Pump P-101_REQUIRES_Seal Inspection",
+      "source": "Pump P-101",
+      "target": "Seal Inspection",
+      "label": "REQUIRES"
+    },
+    {
+      "id": "Pump P-101_REQUIRES_Bearing Inspection",
+      "source": "Pump P-101",
+      "target": "Bearing Inspection",
+      "label": "REQUIRES"
+    },
+    {
+      "id": "Pump P-101_REQUIRES_Alignment",
+      "source": "Pump P-101",
+      "target": "Alignment",
+      "label": "REQUIRES"
+    }
+  ]
 }

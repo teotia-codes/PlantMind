@@ -112,95 +112,118 @@ export default function Lessons() {
     <div className="page-container lessons-page">
       <Toaster position="top-right" richColors />
 
-      <div className="lessons-layout">
+      <div className="lessons-layout-container">
+        <div className="glass-card lessons-header-card">
+          <div className="lessons-title-row">
+            <div className="title-area">
+              <BookOpen
+                className="lessons-header-icon"
+                size={22}
+              />
 
-        {/* ── Left: Input panel ── */}
-        <div className="glass-card lessons-form-section">
-          <h3>Failure Intelligence Query</h3>
-          <p className="section-desc">
-            Enter an equipment tag, incident type, or failure mode. PlantMind will
-            mine the knowledge base for historical patterns and push proactive warnings.
-          </p>
+              <div>
+                <h3>
+                  Failure Intelligence & Lessons Learned
+                </h3>
 
-          <div className="suggested-queries">
-            <span className="sq-label">Quick queries:</span>
-            <div className="sq-chips">
-              {SUGGESTED_QUERIES.map((q, i) => (
-                <button
-                  key={i}
-                  className="sq-chip"
-                  onClick={() => { setQuery(q); runAnalysis(q); }}
-                >
-                  {q}
-                </button>
-              ))}
+                <p>
+                  Mine the plant knowledge base for historical failure modes, root causes, and proactive warning indicators.
+                </p>
+              </div>
             </div>
           </div>
-
-          <div className="form-group">
-            <label htmlFor="lessons-query">Equipment / Incident / Failure Pattern</label>
-            <textarea
-              id="lessons-query"
-              rows={6}
-              placeholder="e.g. Pump P-101 bearing failures, overheating incidents in Boiler-301, vibration anomalies Turbine-A..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-
-          <button
-            className="lessons-btn"
-            disabled={loading || !query.trim()}
-            onClick={() => runAnalysis()}
-          >
-            {loading ? (
-              <>
-                <div className="spinner" />
-                <span>Mining failure patterns...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles size={18} />
-                <span>Generate Lessons Learned Report</span>
-              </>
-            )}
-          </button>
         </div>
 
-        {/* ── Right: Results panel ── */}
-        <div className="glass-card lessons-results-section">
-          <h3>Failure Intelligence Report</h3>
-          <p className="section-desc">
-            Pattern analysis and proactive warnings derived from your document knowledge base.
-          </p>
+        <div className="lessons-grid">
 
-          {loading ? (
-            <div className="results-loader">
-              <div className="spinner" style={{ width: 36, height: 36 }} />
-              <p>Gemini LLM analysing historical failure patterns across knowledge base...</p>
+          {/* ── Left: Input panel ── */}
+          <div className="glass-card lessons-form-section">
+            <h3>Failure Intelligence Query</h3>
+            <p className="section-desc">
+              Enter an equipment tag, incident type, or failure mode. PlantMind will
+              mine the knowledge base for historical patterns and push proactive warnings.
+            </p>
+
+            <div className="suggested-queries">
+              <span className="sq-label">Quick queries:</span>
+              <div className="sq-chips">
+                {SUGGESTED_QUERIES.map((q, i) => (
+                  <button
+                    key={i}
+                    className="sq-chip"
+                    onClick={() => { setQuery(q); runAnalysis(q); }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : result ? (
-            <div className="lessons-report animate-fade-in">
-              <div className="lessons-success-banner">
-                <BookOpen size={20} />
-                <div>
-                  <h4>Lessons Learned Report Ready</h4>
-                  <p>Review patterns and act on preventive measures before next occurrence.</p>
+
+            <div className="form-group">
+              <label htmlFor="lessons-query">Equipment / Incident / Failure Pattern</label>
+              <textarea
+                id="lessons-query"
+                rows={6}
+                placeholder="e.g. Pump P-101 bearing failures, overheating incidents in Boiler-301, vibration anomalies Turbine-A..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+
+            <button
+              className="lessons-btn"
+              disabled={loading || !query.trim()}
+              onClick={() => runAnalysis()}
+            >
+              {loading ? (
+                <>
+                  <div className="spinner" />
+                  <span>Mining failure patterns...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  <span>Generate Lessons Learned Report</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* ── Right: Results panel ── */}
+          <div className="glass-card lessons-results-section">
+            <h3>Failure Intelligence Report</h3>
+            <p className="section-desc">
+              Pattern analysis and proactive warnings derived from your document knowledge base.
+            </p>
+
+            {loading ? (
+              <div className="results-loader">
+                <div className="spinner" style={{ width: 36, height: 36 }} />
+                <p>Gemini LLM analysing historical failure patterns across knowledge base...</p>
+              </div>
+            ) : result ? (
+              <div className="lessons-report animate-fade-in">
+                <div className="lessons-success-banner">
+                  <BookOpen size={20} />
+                  <div>
+                    <h4>Lessons Learned Report Ready</h4>
+                    <p>Review patterns and act on preventive measures before next occurrence.</p>
+                  </div>
+                </div>
+                <div className="lessons-report-body">
+                  {formatLessonsReport(result)}
                 </div>
               </div>
-              <div className="lessons-report-body">
-                {formatLessonsReport(result)}
+            ) : (
+              <div className="results-empty-state">
+                <BookOpen size={48} className="empty-icon" />
+                <h4>Ready for Pattern Analysis</h4>
+                <p>Enter a query or select a quick query on the left to generate your failure intelligence report.</p>
               </div>
-            </div>
-          ) : (
-            <div className="results-empty-state">
-              <BookOpen size={48} className="empty-icon" />
-              <h4>Ready for Pattern Analysis</h4>
-              <p>Enter a query or select a quick query on the left to generate your failure intelligence report.</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
+        </div>
       </div>
     </div>
   );

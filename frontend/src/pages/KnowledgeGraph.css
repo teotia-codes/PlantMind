@@ -1,12 +1,22 @@
+/* Container & Layout */
 .graph-layout {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  height: calc(100vh - 180px);
+  gap: 20px;
+  height: calc(100vh - 120px);
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .graph-header-card {
   padding: 16px 24px !important;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
 
 .graph-title-row {
@@ -15,31 +25,203 @@
   align-items: center;
 }
 
+.title-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.title-area h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text-h) 30%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.title-area p {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
 .network-icon {
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-border);
+}
+
+/* Toolbar & Filters */
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 24px !important;
+  border-radius: 14px;
+}
+
+@media (max-width: 900px) {
+  .graph-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.graph-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  gap: 10px;
+  width: 320px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.graph-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+  background: var(--card-bg);
+}
+
+.graph-search svg {
+  color: var(--text);
+  transition: color 0.3s;
+}
+
+.graph-search:focus-within svg {
   color: var(--accent);
 }
 
+.graph-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-h);
+  font-family: var(--sans);
+  font-size: 14px;
+  width: 100%;
+}
+
+.graph-search input::placeholder {
+  color: var(--text);
+  opacity: 0.7;
+}
+
+.graph-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.graph-filters svg {
+  color: var(--text);
+  margin-right: 6px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--sans);
+  text-transform: capitalize;
+}
+
+.filter-chip:hover {
+  border-color: var(--text);
+  transform: translateY(-1px);
+}
+
+.filter-chip.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Individual filter active color systems matching node color system */
+.filter-chip.equipment.active {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+.filter-chip.regulation.active {
+  background: rgba(249, 115, 22, 0.12);
+  border-color: #f97316;
+  color: #f97316;
+}
+.filter-chip.incident.active {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.filter-chip.maintenance.active {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+  color: #10b981;
+}
+.filter-chip.pressure.active {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+.filter-chip.temperature.active {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: #eab308;
+  color: #eab308;
+}
+.filter-chip.document.active {
+  background: rgba(100, 116, 139, 0.12);
+  border-color: #64748b;
+  color: #64748b;
+}
+
+.chip-icon {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.8;
+}
+
+/* Graph Grid & Viewer */
 .graph-body-grid {
   display: grid;
-  grid-template-columns: 3fr 1fr;
-  gap: 24px;
+  grid-template-columns: 3.2fr 1fr;
+  gap: 20px;
   flex-grow: 1;
-  min-height: 0; /* Important for flex child scroll */
+  min-height: 0;
 }
 
 @media (max-width: 1024px) {
   .graph-body-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 2fr 1fr;
+    grid-template-rows: 1.8fr 1.2fr;
   }
 }
 
 .flow-viewer-container {
+  position: relative;
   padding: 0 !important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   height: 100%;
+  border-radius: 14px;
 }
 
 .react-flow-wrapper {
@@ -48,44 +230,71 @@
   flex-grow: 1;
 }
 
-.graph-loader {
+/* Overlay Graph Legend */
+.graph-legend {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  width: 180px;
+  pointer-events: none;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-color-scheme: dark) {
+  .graph-legend {
+    background: rgba(17, 18, 24, 0.85);
+  }
+}
+
+.graph-legend h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color: var(--text-h);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.legend-grid {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.legend-icon-wrapper {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  gap: 12px;
-  color: var(--text);
-}
-
-/* ReactFlow Custom Overrides */
-.react-flow__renderer {
-  background: var(--bg);
-}
-
-.react-flow__controls {
-  box-shadow: var(--shadow) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.react-flow__controls-button {
-  background: var(--card-bg) !important;
-  color: var(--text-h) !important;
-  border-bottom: 1px solid var(--border) !important;
-  fill: currentColor !important;
-}
-
-.react-flow__controls-button:hover {
-  background: var(--code-bg) !important;
-}
-
-.react-flow__minimap {
-  background: var(--card-bg) !important;
-  border: 1px solid var(--border) !important;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
-  box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
 
 /* Node details panel styling */
@@ -93,33 +302,99 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  border-radius: 14px;
+  gap: 16px;
+  padding: 20px !important;
+}
+
+.node-details-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.section-desc {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.5;
 }
 
 .selected-node-info {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
+/* Dynamic details header card based on node type */
 .node-badge-title {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
-  border-radius: 6px;
-  color: var(--accent);
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
-.node-badge-title h4 {
+.node-badge-title h3 {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
+  color: inherit;
 }
 
-.node-icon {
-  flex-shrink: 0;
+.node-type-badge {
+  display: inline-block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.node-badge-title.equipment {
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #8b5cf6;
+}
+.node-badge-title.regulation {
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  color: #f97316;
+}
+.node-badge-title.incident {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+.node-badge-title.maintenance {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+.node-badge-title.pressure {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+.node-badge-title.temperature {
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+.node-badge-title.document {
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  color: #64748b;
 }
 
 .node-specs {
@@ -128,13 +403,14 @@
   gap: 10px;
   background: var(--code-bg);
   padding: 14px;
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid var(--border);
 }
 
 .spec-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 13px;
   line-height: 1.4;
 }
@@ -147,65 +423,308 @@
 .spec-val {
   color: var(--text-h);
   font-weight: 600;
-  text-align: right;
+  font-family: var(--mono);
 }
 
-.status-ok {
-  color: #10b981;
-}
-
-.telemetry-block h5 {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0 0 10px 0;
-  color: var(--text);
-  text-transform: uppercase;
-}
-
-.telemetry-metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.telemetry-card {
+.metadata-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  padding: 10px;
-  border-radius: 6px;
-  text-align: center;
+  gap: 8px;
 }
 
-.telemetry-card.font-warn {
-  border-color: rgba(245, 158, 11, 0.3);
-  background: rgba(245, 158, 11, 0.02);
-}
-
-.tel-title {
-  font-size: 11px;
-  color: var(--text);
-}
-
-.tel-val {
-  font-size: 15px;
+.metadata-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-h);
+  margin: 8px 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.font-warn .tel-val {
-  color: #f59e0b;
+.metadata-section h4 svg {
+  color: var(--accent);
 }
 
-.node-empty-state {
+.metadata-section p {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  font-style: italic;
+}
+
+.meta-chip {
+  display: flex;
+  align-items: center;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  word-break: break-all;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+}
+
+.meta-chip:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.meta-chip.secondary {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.meta-chip.secondary:hover {
+  transform: translateX(3px);
+  background: rgba(170, 59, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(170, 59, 255, 0.08);
+}
+
+/* Empty states */
+.graph-empty-state, .node-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 40px 10px;
+  padding: 30px 16px;
   color: var(--text);
-  flex-grow: 1;
+  border-radius: 12px;
+  border: 2px dashed var(--border);
+  background: rgba(255, 255, 255, 0.2);
+  box-sizing: border-box;
+}
+
+@media (prefers-color-scheme: dark) {
+  .graph-empty-state, .node-empty-state {
+    background: rgba(17, 18, 24, 0.2);
+  }
+}
+
+.node-empty-state {
+  padding: 40px 16px;
+}
+
+.graph-empty-state h4, .node-empty-state h4 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 12px 0 6px 0;
+  color: var(--text-h);
+}
+
+.graph-empty-state p, .node-empty-state p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.empty-icon {
+  color: var(--text);
+  opacity: 0.4;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Side Stats Section (inside right panel) */
+.graph-stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.graph-stats-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-h);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.graph-stats-section h3 svg {
+  color: var(--accent);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-box {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 8px;
+  text-align: center;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-box::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent);
+  opacity: 0.8;
+}
+
+.stat-box:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.stat-box h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 2px 0;
+  color: var(--text-h);
+}
+
+.stat-box span {
+  font-size: 10px;
+  color: var(--text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Custom themed tops for stat boxes matching legend */
+.stat-box.equipment::before { background: #8b5cf6; }
+.stat-box.document::before { background: #64748b; }
+.stat-box.incident::before { background: #ef4444; }
+.stat-box.regulation::before { background: #f97316; }
+.stat-box.maintenance::before { background: #10b981; }
+.stat-box.relationships::before { background: var(--accent); }
+
+/* ReactFlow Custom Overrides */
+.react-flow__renderer {
+  background: var(--bg);
+}
+
+.react-flow__controls {
+  box-shadow: var(--shadow) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: var(--card-bg) !important;
+  color: var(--text-h) !important;
+  border-bottom: 1px solid var(--border) !important;
+  fill: currentColor !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--code-bg) !important;
+  color: var(--accent) !important;
+}
+
+.react-flow__minimap {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.react-flow__node {
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.react-flow__node:hover {
+  transform: scale(1.05) translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ReactFlow Connection Edges Custom Styling */
+.react-flow__edge-path {
+  stroke: var(--accent) !important;
+  stroke-width: 2px !important;
+  transition: stroke-width 0.2s ease, stroke 0.2s ease;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3.5px !important;
+  stroke: var(--accent) !important;
+}
+
+.react-flow__edge-textbg {
+  fill: var(--card-bg) !important;
+  rx: 4;
+  ry: 4;
+}
+
+.react-flow__edge-text {
+  fill: var(--text-h) !important;
+  font-family: var(--sans) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+/* Refresh Button micro-animation */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-btn:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.icon-btn:hover svg {
+  transform: rotate(180deg);
+}
+
+.icon-btn svg {
+  transition: transform 0.5s ease;
+}
+
+/* Scroll loader animations */
+.graph-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 14px;
+  color: var(--text);
 }

@@ -32,6 +32,7 @@ class _LazyDriver:
 
     def close(self):
         global _driver
+
         if _driver:
             _driver.close()
 
@@ -50,7 +51,8 @@ def _load_sidecar():
     if os.path.exists(SIDECAR_PATH):
 
         try:
-            with open(SIDECAR_PATH, "r") as f:
+
+            with open(SIDECAR_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
 
         except Exception:
@@ -64,50 +66,215 @@ def _load_sidecar():
 
 def _save_sidecar(data):
 
-    with open(SIDECAR_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(SIDECAR_PATH, "w", encoding="utf-8") as f:
 
+        json.dump(
+            data,
+            f,
+            indent=2,
+            ensure_ascii=False
+        )
 
 # ==========================================================
 # Helpers
 # ==========================================================
 
+
+def _normalize(text: str):
+
+    if text is None:
+        return ""
+
+    return " ".join(
+        text.strip().split()
+    ).title()
+
+
 def _node_exists(nodes, node_id):
-    return any(n["id"] == node_id for n in nodes)
+
+    node_id = _normalize(node_id)
+
+    return any(
+        _normalize(n["id"]) == node_id
+        for n in nodes
+    )
 
 
 def _edge_exists(edges, edge_id):
-    return any(e["id"] == edge_id for e in edges)
+
+    return any(
+        e["id"] == edge_id
+        for e in edges
+    )
 
 
-def _add_node(data, node_id, label, node_type):
+def _find_node(nodes, node_id):
 
-    if not _node_exists(data["nodes"], node_id):
+    node_id = _normalize(node_id)
 
-        data["nodes"].append({
-            "id": node_id,
-            "label": label,
-            "type": node_type
-        })
+    for node in nodes:
 
+        if _normalize(node["id"]) == node_id:
+            return node
 
-def _add_edge(data, source, target, relation):
-
-    edge_id = f"{source}_{relation}_{target}"
-
-    if not _edge_exists(data["edges"], edge_id):
-
-        data["edges"].append({
-            "id": edge_id,
-            "source": source,
-            "target": target,
-            "label": relation
-        })
+    return None
 
 
+def _add_node(
+    data,
+    node_id,
+    label,
+    node_type
+):
+
+    node_id = _normalize(node_id)
+    label = _normalize(label)
+
+    if _node_exists(
+        data["nodes"],
+        node_id
+    ):
+        return
+
+    data["nodes"].append({
+
+        "id": node_id,
+
+        "label": label,
+
+        "type": node_type,
+
+        "metadata": {
+
+            "documents": [],
+
+            "degree": 0,
+
+            "relationships": 0,
+
+            "neighbors": []
+
+        }
+
+    })
+
+
+def _update_metadata(
+    data,
+    node_id,
+    neighbour,
+    document=None
+):
+
+    node = _find_node(
+        data["nodes"],
+        node_id
+    )
+
+    if node is None:
+        return
+
+    meta = node.setdefault(
+        "metadata",
+        {}
+    )
+
+    meta.setdefault(
+        "documents",
+        []
+    )
+
+    meta.setdefault(
+        "neighbors",
+        []
+    )
+
+    meta.setdefault(
+        "degree",
+        0
+    )
+
+    meta.setdefault(
+        "relationships",
+        0
+    )
+
+    if neighbour not in meta["neighbors"]:
+        meta["neighbors"].append(
+            neighbour
+        )
+
+    meta["degree"] = len(
+        meta["neighbors"]
+    )
+
+    meta["relationships"] = len(meta["neighbors"])
+    meta["relationships"] += 1
+
+    if (
+        document
+        and document not in meta["documents"]
+    ):
+        meta["documents"].append(
+            document
+        )
 # ==========================================================
 # Main Graph Builder
 # ==========================================================
+
+# ==========================================================
+# Edge Helper
+# ==========================================================
+
+def _add_edge(
+    data,
+    source,
+    target,
+    relation,
+    document=None
+):
+
+    source = _normalize(source)
+    target = _normalize(target)
+
+    edge_id = f"{source}_{relation}_{target}"
+
+    if _edge_exists(
+        data["edges"],
+        edge_id
+    ):
+        return
+
+    data["edges"].append({
+
+        "id": edge_id,
+
+        "source": source,
+
+        "target": target,
+
+        "label": relation
+
+    })
+
+    # Update source metadata
+
+    _update_metadata(
+        data,
+        source,
+        target,
+        document
+    )
+
+    # Update target metadata
+
+    _update_metadata(
+        data,
+        target,
+        source,
+        document
+    )
+
 
 def save_graph(entities: dict, document_name: str):
 
@@ -160,7 +327,8 @@ def save_graph(entities: dict, document_name: str):
                     sidecar,
                     eq,
                     document_name,
-                    "MENTIONED_IN"
+                    "MENTIONED_IN",
+                    document_name
                 )
 
                 session.run(
@@ -206,9 +374,9 @@ def save_graph(entities: dict, document_name: str):
                         sidecar,
                         eq,
                         value,
-                        "HAS_PRESSURE"
+                        "HAS_PRESSURE",
+                        document_name
                     )
-
                     session.run(
                         """
                         MATCH (e:Equipment{name:$eq})
@@ -245,7 +413,8 @@ def save_graph(entities: dict, document_name: str):
                         sidecar,
                         eq,
                         value,
-                        "HAS_TEMPERATURE"
+                        "HAS_TEMPERATURE",
+                        document_name
                     )
 
                     session.run(
@@ -284,7 +453,8 @@ def save_graph(entities: dict, document_name: str):
                         sidecar,
                         eq,
                         reg,
-                        "REGULATED_BY"
+                        "REGULATED_BY",
+                        document_name
                     )
 
                     session.run(
@@ -323,7 +493,8 @@ def save_graph(entities: dict, document_name: str):
                         sidecar,
                         eq,
                         inc,
-                        "HAS_INCIDENT"
+                        "HAS_INCIDENT",
+                        document_name
                     )
 
                     session.run(
@@ -362,7 +533,8 @@ def save_graph(entities: dict, document_name: str):
                         sidecar,
                         eq,
                         m,
-                        "REQUIRES"
+                        "REQUIRES",
+                        document_name
                     )
 
                     session.run(
@@ -389,7 +561,8 @@ def save_graph(entities: dict, document_name: str):
                     sidecar,
                     src,
                     tgt,
-                    relation
+                    relation,
+                    document_name
                 )
 
                 session.run(
@@ -408,7 +581,6 @@ def save_graph(entities: dict, document_name: str):
 
     _save_sidecar(sidecar)
 
-
 # ==========================================================
 # Graph API
 # ==========================================================
@@ -422,47 +594,152 @@ def get_graph_data():
 
         with _get_driver().session() as session:
 
+            # -------------------------------
+            # Fetch Nodes
+            # -------------------------------
+
             node_query = session.run("""
                 MATCH (n)
-                RETURN elementId(n) as id,
-                       labels(n)[0] as type,
-                       n.name as label
+                OPTIONAL MATCH (n)-[r]-()
+                RETURN
+                    elementId(n) AS id,
+                    labels(n)[0] AS type,
+                    n.name AS label,
+                    COUNT(r) AS relationships
             """)
+
+            id_to_label = {}
 
             for row in node_query:
 
+                node_id = str(row["id"])
+                label = row["label"]
+
+                id_to_label[node_id] = label
+
                 nodes.append({
-                    "id": str(row["id"]),
-                    "label": row["label"],
-                    "type": row["type"].lower()
+
+                    "id": node_id,
+
+                    "label": label,
+
+                    "type": row["type"].lower(),
+
+                    "metadata": {
+
+                        "degree": row["relationships"],
+
+                        "relationships": row["relationships"],
+
+                        "documents": [],
+
+                        "neighbors": []
+
+                    }
+
                 })
+
+            # -------------------------------
+            # Fetch Edges
+            # -------------------------------
 
             edge_query = session.run("""
                 MATCH (a)-[r]->(b)
-                RETURN elementId(r) as id,
-                       elementId(a) as source,
-                       elementId(b) as target,
-                       type(r) as relation
+                RETURN
+                    elementId(r) AS id,
+                    elementId(a) AS source,
+                    elementId(b) AS target,
+                    type(r) AS relation
             """)
 
             for row in edge_query:
 
+                source = str(row["source"])
+                target = str(row["target"])
+
                 edges.append({
+
                     "id": str(row["id"]),
-                    "source": str(row["source"]),
-                    "target": str(row["target"]),
+
+                    "source": source,
+
+                    "target": target,
+
                     "label": row["relation"]
+
                 })
 
+            # -------------------------------
+            # Build Neighbor Lists
+            # -------------------------------
+
+            node_lookup = {
+                n["id"]: n
+                for n in nodes
+            }
+
+            for edge in edges:
+
+                src = edge["source"]
+                tgt = edge["target"]
+
+                if src in node_lookup:
+
+                    neighbor = id_to_label.get(tgt, tgt)
+
+                    if neighbor not in node_lookup[src]["metadata"]["neighbors"]:
+                        node_lookup[src]["metadata"]["neighbors"].append(neighbor)
+
+                if tgt in node_lookup:
+
+                    node_lookup[tgt]["metadata"]["neighbors"].append(
+
+                        id_to_label.get(
+                            src,
+                            src
+                        )
+
+                    )
+
+            # -------------------------------
+            # Documents connected to node
+            # -------------------------------
+
+            document_query = session.run("""
+                MATCH (n)-[:MENTIONED_IN]->(d:Document)
+                WITH n, collect(DISTINCT d.name) AS docs
+                RETURN
+                    elementId(n) AS id,
+                    docs
+            """)
+
+            for row in document_query:
+
+                node_id = str(row["id"])
+
+                if node_id in node_lookup:
+
+                    node_lookup[node_id]["metadata"]["documents"] = row["docs"]
+
         return {
+
             "nodes": nodes,
+
             "edges": edges
+
         }
 
-    except Exception:
+    except Exception as e:
+
+        print(
+
+            "[graph_service] Neo4j unavailable, using sidecar:",
+
+            e
+
+        )
 
         return _load_sidecar()
-
 
 # ==========================================================
 # Stats
