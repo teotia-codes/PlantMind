@@ -6,7 +6,7 @@ import os
 import shutil
 import time
 
-from rag.pdf_processor   import extract_text_from_pdf
+from rag.pdf_processor import extract_text
 from rag.text_chunker    import chunk_text
 from rag.chroma_service  import store_chunks, search_chunks, collection, delete_document
 from rag.entity_extractor import extract_entities
@@ -73,46 +73,95 @@ def home():
 # Documents
 # ────────────────────────────────────────────────────────────
 
-@app.post("/upload", tags=["documents"])
-async def upload_pdf(file: UploadFile = File(...)):
-    """
-    Ingest a PDF into the RAG pipeline:
-      1. Save file to disk
-      2. Extract text (page by page with page numbers)
-      3. Chunk into sentence-aware segments
-      4. Embed and store in ChromaDB with source metadata
-      5. Extract entities (equipment, pressures, regulations, …)
-      6. Save equipment nodes to Neo4j + local sidecar
-    """
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+from pathlib import Path
 
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".bmp",
+    ".tiff",
+    ".tif",
+}
+
+
+@app.post("/upload", tags=["documents"])
+async def upload_file(file: UploadFile = File(...)):
+    """
+    Ingest a document into the RAG pipeline.
+
+    Supports:
+    - PDF (searchable & scanned)
+    - PNG
+    - JPG / JPEG
+    - BMP
+    - TIFF
+
+    Pipeline:
+        1. Save uploaded file
+        2. Extract text (OCR automatically if needed)
+        3. Chunk text
+        4. Store embeddings in ChromaDB
+        5. Extract entities
+        6. Update Knowledge Graph
+    """
+
+    ext = Path(file.filename).suffix.lower()
+
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Supported file types: PDF, PNG, JPG, JPEG, BMP, TIFF."
+        )
+
+    file_path = os.path.join(
+        UPLOAD_DIR,
+        file.filename
+    )
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    text = extract_text_from_pdf(file_path)
+    try:
+        # Automatically handles searchable PDFs,
+        # scanned PDFs and image files.
+        text = extract_text(file_path)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Text extraction failed: {str(e)}"
+        )
 
     if not text.strip():
         raise HTTPException(
             status_code=422,
-            detail="Could not extract text from this PDF. It may be a scanned image-only document.",
+            detail="No readable text was found in the uploaded document."
         )
 
     chunks = chunk_text(text)
-    stored = store_chunks(chunks, file.filename)
+
+    stored = store_chunks(
+        chunks,
+        file.filename
+    )
+
     entities = extract_entities(text)
 
-    save_graph(entities, file.filename)
+    save_graph(
+        entities,
+        file.filename
+    )
 
     return {
-        "status":   "success",
+        "status": "success",
         "filename": file.filename,
-        "chunks":   stored,
+        "file_type": ext,
+        "chunks": stored,
+        "text_length": len(text),
         "entities": entities,
     }
-
 
 @app.get("/documents", tags=["documents"])
 def documents():

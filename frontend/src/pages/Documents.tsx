@@ -71,10 +71,32 @@ export default function Documents() {
   };
 
   const uploadFile = async (file: File) => {
-    if (!file.name.endsWith(".pdf")) {
-      toast.error("Only PDF files are supported for industrial SOP parsing!");
-      return;
-    }
+    const allowedExtensions = [
+  ".pdf",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".bmp",
+  ".tiff",
+  ".tif",
+];
+
+const extension =
+  "." +
+  file.name
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+
+if (!allowedExtensions.includes(extension)) {
+
+  toast.error(
+    "Supported formats: PDF, PNG, JPG, JPEG, BMP and TIFF."
+  );
+
+  return;
+
+}
 
     setUploadStatus("uploading");
     setStats(null);
@@ -126,7 +148,7 @@ export default function Documents() {
             <input
               type="file"
               id="file-upload"
-              accept=".pdf"
+              accept=".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.tif"
               onChange={handleFileInput}
               hidden
             />
@@ -135,9 +157,39 @@ export default function Documents() {
                 <Upload size={32} />
               </div>
               <p className="main-prompt">
-                Drag & drop your PDF file here, or <span className="browse-link">browse files</span>
-              </p>
-              <p className="format-hint">Supports PDF documents up to 50MB</p>
+
+Drag & drop your
+
+<strong>PDF or Image</strong>
+
+here, or
+
+<span className="browse-link">
+
+browse files
+
+</span>
+
+</p>
+              <p className="format-hint">
+
+Supports
+
+PDF,
+
+PNG,
+
+JPG,
+
+JPEG,
+
+BMP,
+
+TIFF
+
+(up to 50MB)
+
+</p>
             </label>
           </form>
 
@@ -148,8 +200,23 @@ export default function Documents() {
                 <div className="status-flex">
                   <div className="spinner"></div>
                   <div>
-                    <h4>Ingesting & Vectorizing...</h4>
-                    <p>Splitting text into chunks, embedding vectors with MiniLM, and storing to ChromaDB.</p>
+                    <h4>
+
+Processing Document...
+
+</h4>
+
+<p>
+
+Extracting text (OCR if needed),
+
+creating embeddings,
+
+building the Knowledge Graph
+
+and storing vectors.
+
+</p>
                   </div>
                 </div>
               )}
