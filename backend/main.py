@@ -172,7 +172,17 @@ def documents():
 
     for filename in os.listdir(UPLOAD_DIR):
         path = os.path.join(UPLOAD_DIR, filename)
-        if os.path.isfile(path) and filename.lower().endswith(".pdf"):
+        if os.path.isfile(path) and filename.lower().endswith(
+(
+".pdf",
+".png",
+".jpg",
+".jpeg",
+".bmp",
+".tiff",
+".tif"
+)
+):
             docs.append({
                 "name":   filename,
                 "size":   os.path.getsize(path),
@@ -368,11 +378,45 @@ def maintenance_schedule(req: MaintenanceScheduleRequest):
 
     start = time.time()
 
-    query = (
-        f"{req.equipment} maintenance "
-        "inspection lubrication overhaul "
-        "frequency preventive schedule"
-    )
+    query = f"""
+{req.equipment}
+
+maintenance
+
+inspection
+
+preventive maintenance
+
+lubrication
+
+bearing
+
+alignment
+
+vibration
+
+seal
+
+overhaul
+
+replacement
+
+shutdown
+
+failure
+
+incident
+
+repair
+
+SOP
+
+checklist
+
+frequency
+
+schedule
+"""
 
     results = search_chunks(
         query=query,
@@ -396,25 +440,26 @@ def maintenance_schedule(req: MaintenanceScheduleRequest):
 
     return {
 
-        "equipment": req.equipment,
+"equipment": req.equipment,
 
-        "horizon": req.horizon,
+"horizon": req.horizon,
 
-        "schedule": answer,
+"schedule": answer,
 
-        "latency": latency,
+"latency": latency,
 
-        "sources": list(
-            {
-                meta.get("source", "unknown")
-                for meta in results.get(
-                    "metadatas",
-                    [[]],
-                )[0]
-            }
-        )
+"sources": list(
+{
+meta.get("source","unknown")
+for meta in results.get("metadatas",[[]])[0]
+}
+),
 
-    }
+"chunks_used": len(docs),
+
+"context_length": len(context)
+
+}
 # ────────────────────────────────────────────────────────────
 # Root Cause Analysis
 # ────────────────────────────────────────────────────────────
@@ -628,9 +673,26 @@ def stats():
 
     try:
         doc_count = len([
-            f for f in os.listdir(UPLOAD_DIR)
-            if f.lower().endswith(".pdf")
-        ])
+
+f
+
+for f in os.listdir(UPLOAD_DIR)
+
+if f.lower().endswith(
+
+(
+".pdf",
+".png",
+".jpg",
+".jpeg",
+".bmp",
+".tiff",
+".tif"
+)
+
+)
+
+])
     except Exception:
         pass
 
@@ -670,7 +732,19 @@ def activity():
     try:
         files = [
             f for f in os.listdir(UPLOAD_DIR)
-            if f.lower().endswith(".pdf")
+            if f.lower().endswith(
+
+(
+".pdf",
+".png",
+".jpg",
+".jpeg",
+".bmp",
+".tiff",
+".tif"
+)
+
+)
         ]
 
         for filename in sorted(
@@ -728,5 +802,5 @@ def extract_text_endpoint(filename: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail=f"'{filename}' not found.")
 
-    text = extract_text_from_pdf(file_path)
+    text = extract_text(file_path)
     return {"filename": filename, "text": text}

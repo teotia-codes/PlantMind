@@ -7,34 +7,52 @@ def generate_maintenance_schedule(
     horizon: str,
 ):
     """
-    Generate a preventive maintenance schedule grounded
-    ONLY in the uploaded documents.
+    Generate an AI preventive maintenance plan grounded ONLY
+    in the uploaded documents.
     """
 
     prompt = f"""
-You are a Senior Reliability Engineer with 25 years of industrial maintenance experience.
+You are a Senior Reliability Engineer with 25+ years of
+experience in industrial asset management.
 
-Equipment:
+====================================================
+EQUIPMENT
+====================================================
+
 {equipment}
 
-Planning Horizon:
+====================================================
+PLANNING HORIZON
+====================================================
+
 {horizon}
 
-Knowledge Base Context:
+====================================================
+KNOWLEDGE BASE
+====================================================
+
 {context}
 
-Your task is to generate a preventive maintenance schedule.
+====================================================
+INSTRUCTIONS
+====================================================
 
-Rules:
+Use ONLY the uploaded document context.
 
-- Use ONLY information available in the context.
-- Never invent maintenance intervals.
-- If a frequency is missing, explicitly write:
-  "Frequency not specified in uploaded documents."
+Never invent maintenance intervals.
 
-Return the report in EXACTLY this format.
+If any information is unavailable,
+explicitly write:
 
-# Maintenance Schedule
+"Not specified in uploaded documents."
+
+Generate a professional preventive maintenance report.
+
+====================================================
+OUTPUT FORMAT
+====================================================
+
+# Preventive Maintenance Plan
 
 ## Equipment
 {equipment}
@@ -42,37 +60,93 @@ Return the report in EXACTLY this format.
 ## Planning Horizon
 {horizon}
 
-## Daily Tasks
+## Overall Risk
+(Low / Medium / High)
+
+## AI Confidence
+(0-100%)
+
+## Next Recommended Inspection
+
+---
+
+## 🔴 Immediate Actions
+
 - ...
 
-## Weekly Tasks
+---
+
+## 🟠 Weekly Maintenance
+
 - ...
 
-## Monthly Tasks
+---
+
+## 🟡 Monthly Maintenance
+
 - ...
 
-## Quarterly Tasks
+---
+
+## 🟢 Quarterly Maintenance
+
 - ...
 
-## Annual Tasks
+---
+
+## 🔵 Annual Maintenance
+
 - ...
+
+---
 
 ## Required Spare Parts
+
 - ...
 
-## Safety Precautions
-- ...
+---
 
 ## Recommended Tools
+
 - ...
 
-## Additional Notes
+---
+
+## PPE Required
+
 - ...
 
-If an entire section has no information,
-write:
+---
 
-No information available in uploaded documents.
+## Failure Consequences
+
+- ...
+
+---
+
+## Regulatory References
+
+- ...
+
+---
+
+## AI Recommendations
+
+Provide 3-5 concise recommendations
+to improve equipment reliability.
+
+====================================================
+
+If any section has no information,
+write exactly:
+
+Not specified in uploaded documents.
+
+Do not hallucinate.
+
+Do not invent maintenance intervals.
+
+Base everything ONLY on the supplied context.
 """
 
     return generate_answer(context, prompt)
