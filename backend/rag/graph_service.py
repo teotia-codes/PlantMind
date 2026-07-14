@@ -6,9 +6,9 @@ from neo4j import GraphDatabase
 # Neo4j Configuration
 # ==========================================================
 
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASS = os.getenv("NEO4J_PASS", "Sid@1133")
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USERNAME")
+NEO4J_PASS = os.getenv("NEO4J_PASSWORD")
 
 _driver = None
 
