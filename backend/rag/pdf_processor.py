@@ -1,22 +1,51 @@
 from pathlib import Path
 
-import easyocr
 import numpy as np
 from PIL import Image
 from pdf2image import convert_from_path
 from pypdf import PdfReader
 
-# Create OCR reader only once
-reader = easyocr.Reader(["en"], gpu=False)
+# --------------------------------------------------
+# Lazy EasyOCR Loader
+# --------------------------------------------------
 
+reader = None
+
+
+def get_reader():
+    """
+    Load EasyOCR only when OCR is actually needed.
+    This prevents Render from downloading models during startup.
+    """
+
+    global reader
+
+    if reader is None:
+        print("[OCR] Initializing EasyOCR...")
+
+        import easyocr
+
+        reader = easyocr.Reader(
+            ["en"],
+            gpu=False
+        )
+
+        print("[OCR] EasyOCR Ready.")
+
+    return reader
+
+
+# --------------------------------------------------
+# PDF Extraction
+# --------------------------------------------------
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
     Extract text from a PDF.
 
     1. Try normal PDF extraction.
-    2. If very little text is found, assume the PDF is scanned.
-    3. Perform OCR on every page.
+    2. If little text is found, treat it as a scanned PDF.
+    3. Perform OCR.
     """
 
     text = ""
@@ -25,6 +54,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         pdf = PdfReader(pdf_path)
 
         for page in pdf.pages:
+
             page_text = page.extract_text()
 
             if page_text:
@@ -33,16 +63,31 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     except Exception as e:
         print("PDF extraction error:", e)
 
-    # Searchable PDF
+    # --------------------------------------------------
+    # Normal searchable PDF
+    # --------------------------------------------------
+
     if len(text.strip()) > 100:
         return text
 
     print("[OCR] Scanned PDF detected. Running OCR...")
 
-    pages = convert_from_path(
-    pdf_path,
-    poppler_path=r"C:\poppler\poppler-26.02.0\Library\bin"
-)
+    # --------------------------------------------------
+    # Convert pages to images
+    # --------------------------------------------------
+
+    import os
+
+    if os.name == "nt":
+        pages = convert_from_path(
+            pdf_path,
+            poppler_path=r"C:\poppler\poppler-26.02.0\Library\bin"
+        )
+    else:
+        pages = convert_from_path(pdf_path)
+
+    # Load OCR only here
+    ocr_reader = get_reader()
 
     ocr_text = []
 
@@ -50,10 +95,10 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
         image = np.array(page)
 
-        result = reader.readtext(
+        result = ocr_reader.readtext(
             image,
             detail=0,
-            paragraph=True
+            paragraph=True,
         )
 
         ocr_text.append("\n".join(result))
@@ -61,36 +106,32 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     return "\n\n".join(ocr_text)
 
 
+# --------------------------------------------------
+# Image OCR
+# --------------------------------------------------
+
 def extract_text_from_image(image_path: str) -> str:
-    """
-    OCR for images.
-    """
 
     image = Image.open(image_path)
 
     image = np.array(image)
 
-    result = reader.readtext(
+    ocr_reader = get_reader()
+
+    result = ocr_reader.readtext(
         image,
         detail=0,
-        paragraph=True
+        paragraph=True,
     )
 
     return "\n".join(result)
 
 
-def extract_text(file_path: str) -> str:
-    """
-    Universal text extraction.
+# --------------------------------------------------
+# Universal Extractor
+# --------------------------------------------------
 
-    Supports:
-    - PDF
-    - PNG
-    - JPG
-    - JPEG
-    - BMP
-    - TIFF
-    """
+def extract_text(file_path: str) -> str:
 
     ext = Path(file_path).suffix.lower()
 
