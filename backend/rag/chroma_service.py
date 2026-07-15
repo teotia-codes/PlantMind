@@ -1,6 +1,6 @@
 import uuid
 import chromadb
-from sentence_transformers import SentenceTransformer
+
 
 client = chromadb.PersistentClient(path="chroma_db")
 
@@ -9,7 +9,27 @@ collection = client.get_or_create_collection(
     metadata={"hnsw:space": "cosine"},   # cosine distance → scores map 0-1
 )
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+# Lazy-loaded embedding model
+model = None
+
+
+def get_model():
+    """
+    Load SentenceTransformer only when required.
+    This reduces Render startup memory usage.
+    """
+    global model
+
+    if model is None:
+        print("[Embedding] Loading MiniLM model...")
+
+        from sentence_transformers import SentenceTransformer
+
+        model = SentenceTransformer("all-MiniLM-L6-v2", device = "cpu")
+
+        print("[Embedding] Model Ready.")
+
+    return model
 
 
 def store_chunks(chunks: list[str], source_filename: str = "") -> int:
@@ -20,7 +40,12 @@ def store_chunks(chunks: list[str], source_filename: str = "") -> int:
     if not chunks:
         return 0
 
-    embeddings = model.encode(chunks, show_progress_bar=False).tolist()
+    embedding_model = get_model()
+
+    embeddings = embedding_model.encode(
+        chunks,
+        show_progress_bar=False
+    ).tolist()
 
     ids = [
         f"{source_filename}_{uuid.uuid4().hex[:8]}"
@@ -58,7 +83,12 @@ def search_chunks(query: str, n_results: int = 5, source_filter: str | None = No
         ChromaDB result dict with keys:
             documents, metadatas, distances, ids
     """
-    query_embedding = model.encode([query], show_progress_bar=False).tolist()[0]
+    embedding_model = get_model()
+
+    query_embedding = embedding_model.encode(
+    [query],
+    show_progress_bar=False
+).tolist()[0]
 
     kwargs: dict = {
         "query_embeddings": [query_embedding],
