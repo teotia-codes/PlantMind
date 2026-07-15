@@ -215,7 +215,10 @@ export default function Dashboard() {
                       color: "var(--text-h)",
                       fontSize: 13,
                     }}
-                    formatter={(v: number) => [`${v} chunks`, "Chunks"]}
+                    formatter={(value) => [
+  `${Number(value ?? 0)} chunks`,
+  "Chunks",
+]}
                   />
                   <Bar dataKey="chunks" radius={[4, 4, 0, 0]}>
                     {chunkChart.map((_, i) => (
@@ -258,7 +261,10 @@ export default function Dashboard() {
                       color: "var(--text-h)",
                       fontSize: 13,
                     }}
-                    formatter={(v: number) => [`${v} total chunks`, "KB Total"]}
+                    formatter={(value) => [
+  `${Number(value ?? 0)} total chunks`,
+  "KB Total",
+]}
                   />
                   <Area
                     type="monotone"
