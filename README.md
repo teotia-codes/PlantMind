@@ -1,145 +1,429 @@
-# PlantMind AI — Industrial Knowledge Intelligence Platform
+<div align="center">
 
-> AI-powered platform that ingests heterogeneous industrial documents and makes their collective intelligence queryable, actionable, and continuously updated at the point of need.
+# 🌿 PlantMind AI
+### AI-Powered Industrial Engineering Copilot
 
----
+Transforming Industrial Documents into Actionable Engineering Intelligence using
+**Retrieval-Augmented Generation (RAG), Knowledge Graphs, OCR, and Generative AI**
 
-## Architecture
+![React](https://img.shields.io/badge/Frontend-React-61DAFB?logo=react)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi)
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript)
+![Gemini](https://img.shields.io/badge/LLM-Google_Gemini-orange)
+![ChromaDB](https://img.shields.io/badge/VectorDB-ChromaDB-red)
+![Neo4j](https://img.shields.io/badge/Knowledge_Graph-Neo4j-4581C3)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  React + Vite Frontend  (port 5173)                             │
-│  Dashboard · Documents · Copilot · RCA · Compliance · Lessons   │
-│  Knowledge Graph · Sidebar · Navbar                             │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ HTTP (axios)
-┌─────────────────────────▼───────────────────────────────────────┐
-│  FastAPI Backend  (port 8000)                                   │
-│  /upload  /chat  /rca  /compliance  /lessons  /graph  /stats   │
-└────┬─────────────┬──────────────┬────────────────┬─────────────┘
-     │             │              │                │
- pypdf +       ChromaDB        Gemini          Neo4j (optional)
- sentence-    (vector store)  2.5 Flash       + JSON sidecar
- transformers  MiniLM embeds   (LLM)           (fallback graph)
-```
+</div>
 
 ---
 
-## Quick Start
+# 📖 Overview
 
-### 1. Backend
+Industrial engineers spend countless hours searching through maintenance manuals, Standard Operating Procedures (SOPs), incident reports, compliance documents, and equipment datasheets.
+
+**PlantMind AI** transforms these disconnected documents into an intelligent engineering copilot capable of understanding, comparing, auditing, and reasoning over industrial knowledge.
+
+Rather than acting as a simple chatbot, PlantMind performs **engineering-aware Retrieval-Augmented Generation (RAG)** using semantic search, OCR, vector embeddings, knowledge graphs, and Google's Gemini AI.
+
+---
+
+# 🚀 Key Features
+
+## 📄 Intelligent Document Processing
+
+- PDF ingestion
+- OCR for scanned PDFs
+- Image OCR (PNG, JPG, JPEG, BMP, TIFF)
+- Automatic text extraction
+- Intelligent chunking
+- Vector embedding generation
+
+---
+
+## 🤖 AI Engineering Copilot
+
+Ask engineering questions such as:
+
+- Why did Pump P-101 fail?
+- Explain this maintenance procedure.
+- Which SOP step was skipped?
+- What PPE is required?
+- Summarize this manual.
+
+Powered by:
+
+- Retrieval-Augmented Generation (RAG)
+- Google Gemini
+- Semantic Search
+
+---
+
+## 🔍 Cross Document Intelligence
+
+Compare multiple documents simultaneously.
+
+Examples:
+
+- SOP vs Incident Report
+- Manual vs Datasheet
+- Safety Guidelines vs SOP
+
+Automatically identifies:
+
+- Agreements
+- Differences
+- Missing Information
+- Engineering Recommendations
+
+---
+
+## ⚙ Root Cause Analysis (RCA)
+
+Analyze equipment failures using historical documents.
+
+Outputs:
+
+- Root Cause
+- Supporting Evidence
+- Corrective Actions
+- Preventive Actions
+- AI Confidence
+
+---
+
+## 📋 Compliance Auditor
+
+Automatically audits industrial documentation against safety requirements.
+
+Detects:
+
+- Missing PPE
+- Missing procedures
+- Documentation gaps
+- Safety violations
+- Compliance recommendations
+
+---
+
+## 📈 Preventive Maintenance Planner
+
+Generates AI-powered maintenance schedules including:
+
+- Maintenance frequency
+- Inspection plans
+- Spare parts
+- Required PPE
+- Recommended tools
+- Risk analysis
+
+---
+
+## 📚 Lessons Learned Generator
+
+Learns from previous incidents and generates:
+
+- Best Practices
+- Preventive Measures
+- Operational Improvements
+- Engineering Recommendations
+
+---
+
+## 🧠 Knowledge Graph
+
+Builds an engineering knowledge graph connecting:
+
+- Equipment
+- Components
+- Incidents
+- Procedures
+- Documents
+
+Powered by Neo4j.
+
+---
+
+## 🔎 Semantic Search
+
+Uses Sentence Transformers + ChromaDB for semantic retrieval instead of keyword matching.
+
+Supports:
+
+- Natural language queries
+- Context-aware search
+- Source attribution
+
+---
+
+# 🏗 System Architecture
+
+```
+                        +-----------------------+
+                        |     React Frontend    |
+                        +-----------+-----------+
+                                    |
+                                    |
+                                    ▼
+                       +-------------------------+
+                       |     FastAPI Backend     |
+                       +-----------+-------------+
+                                   |
+         -------------------------------------------------
+         |               |               |               |
+         ▼               ▼               ▼               ▼
+   Google Gemini     ChromaDB       Neo4j Graph      EasyOCR
+      LLM           Vector Store     Knowledge        OCR Engine
+                                         Graph
+```
+
+---
+
+# 🛠 Tech Stack
+
+## Frontend
+
+- React
+- TypeScript
+- Vite
+- Axios
+- Recharts
+- Lucide Icons
+
+---
+
+## Backend
+
+- FastAPI
+- Python
+- Google Gemini API
+- ChromaDB
+- Neo4j
+- EasyOCR
+- Sentence Transformers
+- PDF2Image
+- PyPDF
+- OpenCV
+
+---
+
+## Deployment
+
+Frontend
+
+- Vercel
+
+Backend
+
+- Railway
+
+---
+
+# 📂 Project Structure
+
+```
+PlantMind
+│
+├── frontend/
+│     ├── pages/
+│     ├── services/
+│     ├── components/
+│     └── assets/
+│
+├── backend/
+│     ├── main.py
+│     ├── rag.py
+│     ├── extractor.py
+│     ├── compliance.py
+│     ├── maintenance.py
+│     ├── lessons.py
+│     ├── rca.py
+│     ├── graph.py
+│     └── requirements.txt
+│
+└── README.md
+```
+
+---
+
+# 🌟 Example Workflow
+
+```
+Upload Industrial Documents
+            │
+            ▼
+ OCR + Text Extraction
+            │
+            ▼
+ Semantic Chunking
+            │
+            ▼
+ Vector Embeddings
+            │
+            ▼
+ ChromaDB Storage
+            │
+            ▼
+ Knowledge Graph Generation
+            │
+            ▼
+ Gemini RAG Reasoning
+            │
+            ▼
+ Engineering Insights
+```
+
+---
+
+# 💡 Example Use Cases
+
+- Industrial Maintenance
+- Manufacturing Plants
+- Process Industries
+- Oil & Gas
+- Power Plants
+- Chemical Industries
+- Smart Factories
+- Engineering Knowledge Management
+
+---
+
+# 📊 AI Capabilities
+
+✔ Retrieval-Augmented Generation
+
+✔ OCR
+
+✔ Semantic Search
+
+✔ Multi-document Reasoning
+
+✔ Compliance Analysis
+
+✔ Root Cause Analysis
+
+✔ Maintenance Planning
+
+✔ Lessons Learned
+
+✔ Knowledge Graph
+
+✔ Engineering Question Answering
+
+---
+
+# 🔒 Security
+
+- Environment variables for API keys
+- No hardcoded credentials
+- Local vector storage
+- Safe document processing
+
+---
+
+# 🚀 Getting Started
+
+## Clone Repository
+
+```bash
+git clone https://github.com/yourusername/PlantMind.git
+
+cd PlantMind
+```
+
+---
+
+## Backend
 
 ```bash
 cd backend
 
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Set your Gemini API key
-cp .env.example .env
-# Edit .env and add:  GEMINI_API_KEY=your_key_here
-
-# (Optional) Neo4j credentials — leave defaults if not using Neo4j
-# NEO4J_URI=bolt://localhost:7687
-# NEO4J_USER=neo4j
-# NEO4J_PASS=password
-
-# Start the server
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload
 ```
 
-> **Neo4j is optional.** If not running, the knowledge graph falls back to a local JSON sidecar file (`graph_data.json`) that is auto-populated on every document upload, then to a hardcoded demo graph.
+---
 
-### 2. Frontend
+## Frontend
 
 ```bash
 cd frontend
+
 npm install
+
 npm run dev
-# Opens at http://localhost:5173
 ```
 
 ---
 
 ## Environment Variables
 
-Create `backend/.env`:
+Create `.env`
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=YOUR_API_KEY
 
-# Optional — only needed if running Neo4j
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASS=your_neo4j_password
+NEO4J_URI=YOUR_URI
+
+NEO4J_USERNAME=YOUR_USERNAME
+
+NEO4J_PASSWORD=YOUR_PASSWORD
+
+FRONTEND_URL=http://localhost:5173
 ```
 
 ---
 
-## Features
+# 📸 Screenshots
 
-| Module | Description |
-|---|---|
-| **Document Ingestion** | Upload PDFs → sentence-aware chunking → MiniLM embeddings → ChromaDB vector store |
-| **Entity Extraction** | Regex NER for equipment tags, pressures, temperatures, flow rates, regulatory standards, incident IDs |
-| **Expert Copilot** | RAG-powered Q&A with source citations and per-source confidence scores |
-| **RCA Analyzer** | Structured root-cause analysis grounded in your knowledge base |
-| **Compliance Audit** | SOP / procedure review against regulatory cross-references |
-| **Lessons Learned** | Failure pattern mining with proactive warnings |
-| **Knowledge Graph** | Equipment relationship visualisation (Neo4j / local sidecar / demo fallback) |
-| **Dashboard** | Live stats from `/stats` endpoint — document count, chunk count, equipment nodes |
+> Add screenshots here
 
----
-
-## API Reference
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET  | `/` | Health check |
-| POST | `/upload` | Ingest PDF |
-| GET  | `/documents` | List ingested files |
-| DELETE | `/documents/{filename}` | Remove file + purge vector chunks |
-| POST | `/chat` | RAG Q&A (supports `source_filter`) |
-| POST | `/rca` | Root Cause Analysis |
-| POST | `/compliance` | Compliance audit |
-| POST | `/lessons` | Lessons Learned report |
-| GET  | `/graph` | Equipment relationship graph |
-| GET  | `/equipment` | Equipment tag list |
-| GET  | `/stats` | System statistics |
+- Dashboard
+- AI Chat
+- Document Upload
+- Compliance Audit
+- Root Cause Analysis
+- Maintenance Planner
+- Cross Reference
+- Knowledge Graph
 
 ---
 
-## Tech Stack
+# 🔮 Future Improvements
 
-**Backend:** FastAPI · ChromaDB · sentence-transformers (MiniLM-L6-v2) · Google Gemini 2.5 Flash · pypdf · Neo4j · python-dotenv
-
-**Frontend:** React 19 · TypeScript · Vite · React Router · Recharts · ReactFlow · Lucide React · Sonner · Axios
+- Predictive Maintenance using Time-Series Data
+- IoT Sensor Integration
+- Digital Twin Support
+- Multi-language OCR
+- Report Export (PDF)
+- Fine-tuned Industrial LLM
+- SAP / ERP Integration
+- Real-time Equipment Monitoring
 
 ---
 
-## Project Structure
+# 👨‍💻 Authors
 
-```
-PlantMind/
-├── backend/
-│   ├── main.py                  # FastAPI app + all endpoints
-│   ├── requirements.txt
-│   ├── .env.example
-│   └── rag/
-│       ├── pdf_processor.py     # pypdf text extraction
-│       ├── text_chunker.py      # sentence-aware chunker with overlap
-│       ├── chroma_service.py    # ChromaDB store/search/delete + cosine metric
-│       ├── entity_extractor.py  # Regex NER — 7 entity categories
-│       ├── gemini_service.py    # Gemini 2.5 Flash wrapper
-│       └── graph_service.py     # Neo4j + JSON sidecar + demo fallback
-└── frontend/
-    └── src/
-        ├── pages/               # Dashboard · Documents · Copilot · RCA
-        │                        # Compliance · KnowledgeGraph · Lessons
-        ├── components/          # Sidebar · Navbar
-        └── services/api.ts      # Typed Axios client
-```
+Developed by
+
+**Priyanshu Teotia**
+
+Industrial AI | RAG | FastAPI | React | Knowledge Graphs
+
+---
+
+# 📜 License
+
+This project is released under the MIT License.
+
+---
+
+<div align="center">
+
+### ⭐ If you found this project useful, consider giving it a star!
+
+**Built with ❤️ using AI for Industrial Engineering**
+
+</div>
