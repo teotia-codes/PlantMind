@@ -378,16 +378,30 @@ FRONTEND_URL=http://localhost:5173
 
 # 📸 Screenshots
 
-> Add screenshots here
+### Dashboard
+![Dashboard](screenshots/dashboard.png)
 
-- Dashboard
-- AI Chat
-- Document Upload
-- Compliance Audit
-- Root Cause Analysis
-- Maintenance Planner
-- Cross Reference
-- Knowledge Graph
+### AI Chat
+![AI Chat](screenshots/chat.png)
+
+### Document Upload
+![Document Upload](screenshots/upload.png)
+
+### Compliance Audit
+![Compliance Audit](screenshots/compliance.png)
+
+### Root Cause Analysis
+![Root Cause Analysis](screenshots/rca.png)
+
+### Maintenance Planner
+![Maintenance Planner](screenshots/maintenance.png)
+
+### Cross Reference
+![Cross Reference](screenshots/cross-reference.png)
+
+### Lessons Learned
+![Lessons Learned](screenshots/lessons.png)
+
 
 ---
 
