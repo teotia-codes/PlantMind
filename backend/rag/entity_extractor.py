@@ -22,6 +22,7 @@ def extract_entities(text: str):
     # --------------------------------------------------------
 
     equipment_pattern = (
+        r"(?<!-)(?<!\w)"  # not glued onto a preceding hyphen or word char
         r"(?:Pump|Motor|Valve|Boiler|Turbine|Compressor|"
         r"Condenser|Heat\s+Exchanger|Fan|Generator|"
         r"Reactor|Separator|Vessel|Tank|Column|"
@@ -158,30 +159,34 @@ def extract_entities(text: str):
 
     relationships = []
 
+    # Each side of the verb must itself be a full equipment mention
+    # (e.g. "Pump P-101", "Heat Exchanger E-201") rather than a single
+    # loose word, otherwise multi-word tags get truncated to their last
+    # or first token (e.g. "P-101" -> "Heat" instead of the full names).
     relation_patterns = [
 
         (
-            r"([A-Za-z0-9\-]+)\s+(?:supplies|feeds|delivers)\s+([A-Za-z0-9\-]+)",
+            rf"({equipment_pattern})\s+(?:supplies|feeds|delivers)\s+({equipment_pattern})",
             "SUPPLIES",
         ),
 
         (
-            r"([A-Za-z0-9\-]+)\s+(?:connects to|connected to)\s+([A-Za-z0-9\-]+)",
+            rf"({equipment_pattern})\s+(?:connects to|connected to)\s+({equipment_pattern})",
             "CONNECTED_TO",
         ),
 
         (
-            r"([A-Za-z0-9\-]+)\s+(?:protects)\s+([A-Za-z0-9\-]+)",
+            rf"({equipment_pattern})\s+(?:protects)\s+({equipment_pattern})",
             "PROTECTS",
         ),
 
         (
-            r"([A-Za-z0-9\-]+)\s+(?:monitors)\s+([A-Za-z0-9\-]+)",
+            rf"({equipment_pattern})\s+(?:monitors)\s+({equipment_pattern})",
             "MONITORS",
         ),
 
         (
-            r"([A-Za-z0-9\-]+)\s+(?:controls)\s+([A-Za-z0-9\-]+)",
+            rf"({equipment_pattern})\s+(?:controls)\s+({equipment_pattern})",
             "CONTROLS",
         ),
 
@@ -197,10 +202,13 @@ def extract_entities(text: str):
 
         for src, tgt in matches:
 
+            src = re.sub(r"\s+", " ", src.strip())
+            tgt = re.sub(r"\s+", " ", tgt.strip())
+
             relationships.append(
                 {
-                    "source": src.strip(),
-                    "target": tgt.strip(),
+                    "source": src,
+                    "target": tgt,
                     "relation": relation,
                 }
             )
