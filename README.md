@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌿 PlantMind AI
+# 🌿 PlantMind AI   
 ### AI-Powered Industrial Engineering Copilot
 
 Transforming Industrial Documents into Actionable Engineering Intelligence using
